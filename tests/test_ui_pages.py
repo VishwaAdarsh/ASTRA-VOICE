@@ -48,5 +48,6 @@ def test_tools_page_dynamic_population():
     window = MainWindow(controller=controller)
     tools_page = window.tools_page
 
-    # Should dynamically populate grid cards for 4 registered tools
-    assert tools_page.grid.count() == 4
+    # Should dynamically populate grid cards for all registered tools
+    assert tools_page.grid.count() == len(agent.registry.list_tools())
+

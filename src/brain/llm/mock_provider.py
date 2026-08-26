@@ -1,5 +1,6 @@
 """
 Mock LLM Provider for deterministic offline testing.
+Supports Phase 1-5 tool call patterns.
 """
 
 import time
@@ -30,7 +31,7 @@ class MockLLMProvider(LLMProvider):
             latency_ms=(time.time() - start_time) * 1000,
         )
 
-        # 1. Match Open Application Intent
+        # 1. Open Application Intent
         if "calculator" in text or "calc" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
@@ -56,7 +57,71 @@ class MockLLMProvider(LLMProvider):
                 usage=usage,
             )
 
-        # 2. Match Open Folder Intent
+        # 2. Filesystem Tools (Phase 5)
+        elif "find" in text or "search" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="search_files",
+                arguments={"query": "report", "location": "Downloads"},
+                reason="User requested file search.",
+                usage=usage,
+            )
+        elif "create a folder" in text or "create folder" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="create_folder",
+                arguments={"folder_name": "AI Research", "location": "Desktop"},
+                reason="User requested folder creation.",
+                usage=usage,
+            )
+        elif "create text file" in text or "create file" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="create_text_file",
+                arguments={"filename": "report.txt", "content": "Hello ASTRA", "location": "Documents"},
+                reason="User requested text file creation.",
+                usage=usage,
+            )
+        elif "rename" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="rename_file",
+                arguments={"source": "report.pdf", "new_name": "final_report.pdf"},
+                reason="User requested file rename.",
+                usage=usage,
+            )
+        elif "move" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="move_file",
+                arguments={"source": "report.pdf", "destination": "Documents"},
+                reason="User requested moving file.",
+                usage=usage,
+            )
+        elif "copy" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="copy_file",
+                arguments={"source": "report.pdf", "destination": "Desktop"},
+                reason="User requested file copy.",
+                usage=usage,
+            )
+        elif "delete" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="delete_file",
+                arguments={"target": "old_report.pdf"},
+                reason="User requested safe file deletion.",
+                usage=usage,
+            )
+        elif "organize" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="organize_folder",
+                arguments={"folder": "Downloads", "dry_run": True},
+                reason="User requested folder organization preview.",
+                usage=usage,
+            )
         elif "downloads" in text or "download" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
@@ -65,16 +130,57 @@ class MockLLMProvider(LLMProvider):
                 reason="User requested opening downloads folder.",
                 usage=usage,
             )
-        elif "documents" in text:
+
+        # 3. Applications & Projects (Phase 5)
+        elif "close" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
-                tool_name="open_folder",
-                arguments={"folder_name": "documents"},
-                reason="User requested opening documents folder.",
+                tool_name="close_application",
+                arguments={"app_name": "calculator"},
+                reason="User requested closing application.",
+                usage=usage,
+            )
+        # 5. Conversational / Ambiguous
+        elif "open my project" in text:
+            return LLMDecision(
+                decision_type=DecisionType.CLARIFICATION,
+                message="Which project folder would you like me to open?",
+                reason="Ambiguous request with multiple matching targets.",
+                usage=usage,
+            )
+        elif "project" in text and ("ip" in text or "astra" in text):
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="open_project",
+                arguments={"project_name": "ASTRA-VOICE"},
+                reason="User requested opening project.",
                 usage=usage,
             )
 
-        # 3. Match Open Website Intent
+        elif "doing" in text or "how is my computer" in text or "resources" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="resource_information",
+                arguments={},
+                reason="User requested system resource status.",
+                usage=usage,
+            )
+        elif "screenshot" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="screenshot",
+                arguments={},
+                reason="User requested screenshot capture.",
+                usage=usage,
+            )
+        elif "volume" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="volume_control",
+                arguments={"action": "up"},
+                reason="User requested volume control.",
+                usage=usage,
+            )
         elif "youtube" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
@@ -83,17 +189,7 @@ class MockLLMProvider(LLMProvider):
                 reason="User requested opening youtube website.",
                 usage=usage,
             )
-        elif "google" in text:
-            return LLMDecision(
-                decision_type=DecisionType.TOOL_CALL,
-                tool_name="open_website",
-                arguments={"target": "google"},
-                reason="User requested opening google website.",
-                usage=usage,
-            )
-
-        # 4. Match System Info Intent
-        elif "system information" in text or "specs" in text or "system info" in text:
+        elif "system information" in text or "specs" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
                 tool_name="system_information",
@@ -102,16 +198,14 @@ class MockLLMProvider(LLMProvider):
                 usage=usage,
             )
 
-        # 5. Match Ambiguous Request -> Clarification
-        elif "open project" in text or "open my project" in text:
+        # 5. Conversational / Ambiguous
+        elif "open my project" in text:
             return LLMDecision(
                 decision_type=DecisionType.CLARIFICATION,
                 message="Which project folder would you like me to open?",
                 reason="Ambiguous request with multiple matching targets.",
                 usage=usage,
             )
-
-        # 6. Conversational / Unsupported Intent
         elif "hello" in text or "hi" in text:
             return LLMDecision(
                 decision_type=DecisionType.RESPONSE,

@@ -20,17 +20,35 @@ from src.core.logger import get_logger
 from src.execution.executor import ToolExecutor
 from src.execution.verifier import ToolVerifier
 from src.security.permissions import PermissionManager
+from src.tools.applications import ApplicationStatusTool, CloseApplicationTool, OpenProjectTool
 from src.tools.applications import OpenApplicationTool
 from src.tools.browser import OpenWebsiteTool
+from src.tools.filesystem import (
+    CopyFileTool,
+    CreateFolderTool,
+    CreateTextFileTool,
+    DeleteFileTool,
+    FileMetadataTool,
+    MoveFileTool,
+    OpenFileTool,
+    OrganizeFolderTool,
+    RenameFileTool,
+    SearchFilesTool,
+)
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
-from src.tools.system import SystemInformationTool
+from src.tools.system import (
+    ResourceInformationTool,
+    ScreenshotTool,
+    SystemInformationTool,
+    VolumeControlTool,
+)
 
 logger = get_logger()
 
 
 class AstraAgent:
-    """Core ASTRA Agent Orchestrator for Phase 4 LLM Reasoning Engine."""
+    """Core ASTRA Agent Orchestrator for Phase 4 & Phase 5 Computer Control."""
 
     def __init__(
         self,
@@ -53,7 +71,7 @@ class AstraAgent:
             verifier=self.verifier,
         )
 
-        # Register standard Phase 1 tools
+        # Register standard Phase 1-5 tools
         self._register_default_tools()
 
         # Initialize Phase 4 LLM Subsystem
@@ -71,12 +89,37 @@ class AstraAgent:
         self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
 
     def _register_default_tools(self) -> None:
-        """Register Phase 1 allowlisted tools."""
+        """Register Phase 1-5 allowlisted tools."""
+        # Phase 1
         self.registry.register(OpenApplicationTool(config=self.config))
         self.registry.register(OpenFolderTool(config=self.config))
         self.registry.register(OpenWebsiteTool(config=self.config))
         self.registry.register(SystemInformationTool())
-        logger.info(f"Registered default tools: {self.registry.list_tools()}")
+
+        # Phase 5 Filesystem
+        self.registry.register(SearchFilesTool(config=self.config))
+        self.registry.register(FileMetadataTool(config=self.config))
+        self.registry.register(OpenFileTool(config=self.config))
+        self.registry.register(CreateFolderTool(config=self.config))
+        self.registry.register(CreateTextFileTool(config=self.config))
+        self.registry.register(RenameFileTool(config=self.config))
+        self.registry.register(MoveFileTool(config=self.config))
+        self.registry.register(CopyFileTool(config=self.config))
+        self.registry.register(DeleteFileTool(config=self.config))
+        self.registry.register(OrganizeFolderTool(config=self.config))
+
+        # Phase 5 Applications & Projects
+        self.registry.register(ApplicationStatusTool(config=self.config))
+        self.registry.register(CloseApplicationTool(config=self.config))
+        self.registry.register(OpenProjectTool(config=self.config))
+
+        # Phase 5 System
+        self.registry.register(ResourceInformationTool())
+        self.registry.register(ScreenshotTool(config=self.config))
+        self.registry.register(VolumeControlTool())
+
+        logger.info(f"Registered {len(self.registry.list_tools())} tools: {self.registry.list_tools()}")
+
 
     def process_command(self, raw_input: str) -> tuple[str, ToolResult]:
         """Process a user command through the LLM Reasoning Engine with Fallback Engine."""

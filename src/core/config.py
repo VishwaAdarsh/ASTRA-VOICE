@@ -25,6 +25,10 @@ class Config:
         self.log_file = self.root_dir / log_path_str
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
 
+        # Screenshots output directory
+        self.screenshots_dir = self.root_dir / "data" / "screenshots"
+        self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+
         self.permissions_mode = os.getenv("PERMISSIONS_MODE", "NORMAL").upper()
 
         # Application mapping allowlist for Windows
@@ -52,6 +56,13 @@ class Config:
             "music": user_profile / "Music",
             "home": user_profile,
         }
+
+        # Project directories
+        self.project_dirs: list[Path] = [
+            user_profile / "Documents" / "GitHub",
+            user_profile / "Projects",
+            user_profile / "Desktop",
+        ]
 
         # Safe website URL mapping / shortcuts
         self.website_allowlist: dict[str, str] = {
@@ -85,6 +96,10 @@ class Config:
         self.llm_max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "512"))
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))
         self.llm_fallback_enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() in ("true", "1", "yes")
+
+        # Filesystem Controls (Phase 5)
+        self.max_search_results = int(os.getenv("MAX_SEARCH_RESULTS", "10"))
+        self.max_bulk_operations = int(os.getenv("MAX_BULK_OPERATIONS", "50"))
 
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""

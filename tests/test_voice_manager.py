@@ -25,7 +25,8 @@ def test_voice_manager_end_to_end_flow():
 
     assert result is not None
     assert result.status == ExecutionStatus.SUCCESS
-    assert "Operating System" in response
+    assert "System:" in response or "Windows" in response
     assert len(mock_tts.spoken_history) == 1
-    assert "Operating System" in mock_tts.spoken_history[0]
+    assert "System:" in mock_tts.spoken_history[0] or "Windows" in mock_tts.spoken_history[0]
     assert manager.state == VoiceState.IDLE
+

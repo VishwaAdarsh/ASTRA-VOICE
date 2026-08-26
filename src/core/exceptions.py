@@ -91,3 +91,28 @@ class ContextWindowOverflowError(LLMError):
     """Raised when conversation context exceeds maximum token window."""
 
     pass
+
+
+# Advanced Computer & File Control Exceptions (Phase 5)
+class FilesystemError(ToolError):
+    """Base exception for filesystem operations."""
+
+    pass
+
+
+class PathSecurityError(FilesystemError):
+    """Raised when a path fails security policy validation (e.g. path traversal or restricted system paths)."""
+
+    pass
+
+
+class FileCollisionError(FilesystemError):
+    """Raised when a file operation encounters an unexpected destination collision."""
+
+    pass
+
+
+class ApplicationNotFoundError(ToolError):
+    """Raised when an application executable or process cannot be located."""
+
+    pass

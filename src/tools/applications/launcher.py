@@ -9,6 +9,7 @@ from typing import Any
 from src.brain.models import ExecutionStatus, PermissionLevel, ToolResult
 from src.core.config import Config
 from src.core.logger import get_logger
+from src.tools.applications.aliases import ApplicationRegistry
 from src.tools.base import BaseTool
 
 logger = get_logger()
@@ -21,14 +22,15 @@ class OpenApplicationTool(BaseTool):
     description = "Launches an allowlisted Windows application."
     permission_level = PermissionLevel.SAFE
 
-    def __init__(self, config: Config | None = None):
+    def __init__(self, config: Config | None = None, app_registry: ApplicationRegistry | None = None):
         self.config = config or Config()
+        self.app_registry = app_registry or ApplicationRegistry(config=self.config)
 
     def validate(self, parameters: dict[str, Any]) -> bool:
         app_name = parameters.get("app_name")
         if not app_name or not isinstance(app_name, str):
             return False
-        return self.config.is_app_allowed(app_name)
+        return self.config.is_app_allowed(app_name) or self.app_registry.resolve_executable(app_name) is not None
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         start_time = time.time()
@@ -42,7 +44,7 @@ class OpenApplicationTool(BaseTool):
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
 
-        executable = self.config.get_app_executable(app_name)
+        executable = self.app_registry.resolve_executable(app_name) or self.config.get_app_executable(app_name)
         if not executable:
             return ToolResult(
                 status=ExecutionStatus.NOT_FOUND,
