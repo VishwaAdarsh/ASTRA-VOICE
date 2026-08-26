@@ -57,7 +57,34 @@ class MockLLMProvider(LLMProvider):
                 usage=usage,
             )
 
-        # 2. Filesystem Tools (Phase 5)
+        # 4. Web Tools (Phase 6)
+        elif "search the web" in text or "web search" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="search_web",
+                arguments={"query": "Python 3.14 features", "limit": 5},
+                reason="User requested web search.",
+                usage=usage,
+            )
+        elif "research" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="research_topic",
+                arguments={"topic": "AI Agent Frameworks", "depth": "STANDARD"},
+                reason="User requested topic research.",
+                usage=usage,
+            )
+        elif "fetch webpage" in text or "fetch url" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="fetch_webpage",
+                arguments={"url": "https://docs.python.org/3.14/"},
+                reason="User requested webpage fetch.",
+                usage=usage,
+            )
+
+        # 5. System Tools (Phase 5)
+
         elif "find" in text or "search" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,

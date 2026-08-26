@@ -116,3 +116,34 @@ class ApplicationNotFoundError(ToolError):
     """Raised when an application executable or process cannot be located."""
 
     pass
+
+
+# Web Intelligence & Browser Research Exceptions (Phase 6)
+class WebError(ToolError):
+    """Base exception for web operations."""
+
+    pass
+
+
+class WebSearchError(WebError):
+    """Raised when a web search request fails."""
+
+    pass
+
+
+class WebFetchError(WebError):
+    """Raised when retrieving a webpage fails or times out."""
+
+    pass
+
+
+class SSRFSecurityError(WebError):
+    """Raised when a URL targets a private IP, loopback, or invalid scheme."""
+
+    pass
+
+
+class SourceValidationError(WebError):
+    """Raised when a research claim fails source validation."""
+
+    pass

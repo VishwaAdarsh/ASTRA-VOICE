@@ -101,6 +101,12 @@ class Config:
         self.max_search_results = int(os.getenv("MAX_SEARCH_RESULTS", "10"))
         self.max_bulk_operations = int(os.getenv("MAX_BULK_OPERATIONS", "50"))
 
+        # Web Intelligence & Research Engine (Phase 6)
+        self.web_search_provider = os.getenv("WEB_SEARCH_PROVIDER", "mock").lower()
+        self.max_fetch_size_mb = float(os.getenv("MAX_FETCH_SIZE_MB", "1.0"))
+        self.max_research_sources = int(os.getenv("MAX_RESEARCH_SOURCES", "8"))
+        self.web_cache_ttl_sec = int(os.getenv("WEB_CACHE_TTL_SEC", "3600"))
+
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""
         return app_name.lower().strip() in self.app_allowlist

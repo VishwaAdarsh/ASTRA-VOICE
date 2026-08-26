@@ -43,8 +43,10 @@ from src.tools.system import (
     SystemInformationTool,
     VolumeControlTool,
 )
+from src.tools.web import FetchWebpageTool, ResearchTopicTool, SearchWebTool
 
 logger = get_logger()
+
 
 
 class AstraAgent:
@@ -118,7 +120,13 @@ class AstraAgent:
         self.registry.register(ScreenshotTool(config=self.config))
         self.registry.register(VolumeControlTool())
 
+        # Phase 6 Web Intelligence
+        self.registry.register(SearchWebTool(config=self.config))
+        self.registry.register(FetchWebpageTool(config=self.config))
+        self.registry.register(ResearchTopicTool(config=self.config))
+
         logger.info(f"Registered {len(self.registry.list_tools())} tools: {self.registry.list_tools()}")
+
 
 
     def process_command(self, raw_input: str) -> tuple[str, ToolResult]:

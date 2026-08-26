@@ -1,13 +1,14 @@
 # ASTRA — Personal AI Assistant for Windows
 
-![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_5_Computer_Control-blue.svg)
+![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_6_Web_Intelligence-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
 
 **ASTRA** is a long-term personal AI computer assistant for Windows designed to understand natural language, communicate through voice and text, control authorized computer operations, search the web, manage files, maintain memory, and assist with daily productivity.
 
-> **Current Phase:** Phase 5 Advanced Computer & File Control (Completed).  
-> Phase 5 upgrades ASTRA into a practical computer control assistant featuring human-friendly path resolution, deterministic file searching, metadata extraction, safe file creation/renaming/moving/copying/recycling, folder organization previews, application status/lifecycle management, project discovery, system resource monitoring, screenshot capture, and volume control.
+> **Current Phase:** Phase 6 Web Intelligence & Browser Research Engine (Completed).  
+> Phase 6 introduces provider-neutral web search, SSRF/private IP protection, HTML chrome stripping & content extraction, deterministic source ranking, multi-source research synthesis, claim attribution, and numbered source citations ([1], [2]).
+
 
 
 
