@@ -1,0 +1,15 @@
+# ASTRA Core Dependencies (Phase 1, 2 & 3)
+python-dotenv>=1.0.0
+psutil>=5.9.0
+
+# Voice Subsystem Dependencies (Phase 2)
+pyttsx3>=2.90
+speechrecognition>=3.10.0
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# Desktop Interface Dependencies (Phase 3)
+PySide6>=6.5.0
+
+# Development & Testing
+pytest>=8.0.0
