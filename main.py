@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import signal
+import socket
 import sys
 import threading
 import time
@@ -40,6 +41,15 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug logging")
     parser.add_argument("--port", type=int, default=8000, help="Backend API server port (default 8000)")
     return parser.parse_args()
+
+
+def find_available_port(preferred_port: int = 8000, host: str = "127.0.0.1") -> int:
+    """Find preferred port if free, or first available open port."""
+    for p in range(preferred_port, preferred_port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex((host, p)) != 0:
+                return p
+    return preferred_port
 
 
 def start_server_thread(agent, voice_manager, port: int = 8000):
@@ -70,8 +80,13 @@ def main():
     agent = lifecycle.startup()
     voice_mgr = VoiceManager(agent=agent)
 
+    # Check and select available port cleanly
+    bound_port = find_available_port(preferred_port=args.port)
+    if bound_port != args.port:
+        print(f"[ASTRA] Requested port {args.port} is occupied. Using available port {bound_port}.")
+
     # Start FastAPI + WebSocket communication server
-    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=args.port)
+    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=bound_port)
     time.sleep(0.5)  # Give server short moment to bind port
 
     # Register OS signal handlers for graceful shutdown
@@ -84,7 +99,7 @@ def main():
     signal.signal(signal.SIGTERM, _sig_handler)
 
     if args.backend:
-        print(f"ASTRA Backend Engine & API Server running on http://127.0.0.1:{args.port}")
+        print(f"ASTRA Backend Engine & API Server running on http://127.0.0.1:{bound_port}")
         print("Press Ctrl+C to stop.")
         try:
             server_thread.join()
@@ -108,7 +123,7 @@ def main():
             app = QApplication.instance() or QApplication(sys.argv)
             app.setApplicationName("ASTRA Personal AI Assistant")
 
-            window = AstraWebWindow(server_url=f"http://127.0.0.1:{args.port}")
+            window = AstraWebWindow(server_url=f"http://127.0.0.1:{bound_port}")
             window.show()
 
             try:

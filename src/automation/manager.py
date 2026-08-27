@@ -182,13 +182,18 @@ class AutomationManager:
         self.scheduler.cancel_automation(auto_id)
         return self.repository.delete_automation(auto_id)
 
-    def stop_all_automations(self) -> None:
-        """Emergency Stop: pause all active automations and cancel scheduling timers."""
-        logger.warning("AutomationManager triggering GLOBAL EMERGENCY STOP!")
+    def stop_all_automations(self, emergency: bool = False) -> None:
+        """Pause all active automations and cancel scheduling timers."""
+        if emergency:
+            logger.warning("AutomationManager triggering GLOBAL EMERGENCY STOP!")
+        else:
+            logger.info("AutomationManager stopping all active automations for system shutdown.")
+
         self.scheduler.cancel_all()
         for auto in self.repository.list_automations(status=AutomationStatus.ACTIVE):
             auto.status = AutomationStatus.PAUSED
             self.repository.save_automation(auto)
+
 
     def list_automations(self) -> list[Automation]:
         """List all persisted automations."""
