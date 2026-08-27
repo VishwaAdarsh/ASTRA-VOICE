@@ -1,5 +1,6 @@
 """
-PySide6 Application Launcher and Lifecycle Integration.
+PySide6 Application Launcher (Stitch Design System Integration).
+Single primary UI launcher for ASTRA Desktop UI.
 """
 
 import sys
@@ -12,8 +13,8 @@ from src.voice.manager import VoiceManager
 
 
 def launch_ui() -> None:
-    """Launch the ASTRA PySide6 Desktop GUI."""
-    app = QApplication(sys.argv)
+    """Launch the ASTRA PySide6 Desktop GUI with Stitch Design System."""
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("ASTRA Personal AI Assistant")
 
     # Initialize Core & Voice Engine
@@ -24,9 +25,9 @@ def launch_ui() -> None:
     # Initialize Controller Bridge
     controller = AppController(agent=agent, voice_manager=voice_manager)
 
-    # Apply Theme
+    # Apply Stitch Theme
     theme_manager = ThemeManager()
-    theme_manager.set_theme("dark", app=app)
+    theme_manager.apply_theme(app, "dark")
 
     # Create & Show Main Window
     window = MainWindow(controller=controller)
@@ -36,7 +37,7 @@ def launch_ui() -> None:
     try:
         sys.exit(app.exec())
     finally:
-        lifecycle.shutdown()
+        lifecycle.shutdown(agent)
 
 
 if __name__ == "__main__":
