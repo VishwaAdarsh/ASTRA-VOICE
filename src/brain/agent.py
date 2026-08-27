@@ -292,13 +292,19 @@ class AstraAgent:
 
 
     def _format_response(self, result: ToolResult) -> str:
-        """Format ToolResult into a clean response string."""
+        """Format ToolResult into a clean, natural assistant response string."""
         if result.status == ExecutionStatus.SUCCESS:
-            return f"✓ {result.message}"
+            msg = result.message.strip()
+            if msg.lower() == "downloads opened.":
+                return "Done. I've opened your Downloads folder."
+            elif not msg.startswith("✓") and not msg.startswith("Done"):
+                return f"Done. {msg}"
+            return msg
         elif result.status == ExecutionStatus.DENIED:
-            return f"Permission Denied: {result.message}"
+            return f"Security authorization required: {result.message}"
         else:
-            return f"Action Failed: {result.message}"
+            return f"I couldn't complete that action: {result.message}"
+
 
     def shutdown(self) -> None:
         """Shutdown background subsystems and timers."""
