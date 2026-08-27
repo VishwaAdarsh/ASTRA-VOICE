@@ -20,8 +20,10 @@ class SidebarNav(QFrame):
         ("Memory", 4),
         ("Vision", 5),
         ("Tasks", 6),
-        ("Settings", 7),
+        ("Automations", 7),
+        ("Settings", 8),
     ]
+
 
 
 

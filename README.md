@@ -1,36 +1,26 @@
 # ASTRA — Personal AI Assistant for Windows
 
-![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_9_Autonomous_Task_Engine-blue.svg)
+![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_10_Proactive_Assistant-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
+![License](https://img.shields.io/badge/license-MIT-purple.svg)
 
-
+ASTRA is an intelligent, voice-enabled, desktop-integrated personal AI assistant designed specifically for Windows. Built with modern Python, PySide6 desktop GUI, Voice Intelligence (STT/TTS/VAD), an extensible LLM Brain reasoning engine, advanced computer & filesystem controls, internet web research capabilities, long-term persistent memory context, vision perception, bounded autonomous task execution, and controlled proactive personal automation.
 
 ---
 
-## 1. Overview
+## 🚀 Development Status: Phase 10 — Proactive Personal Assistant & Automation Complete
 
-The core objective of Phase 1 is to establish a strict, layered execution pipeline where user commands are parsed, matched to deterministic intents, routed to registered safe tools, verified, and executed under permission policy controls without arbitrary OS command execution.
-
-```text
-User Command
-    ↓
-Command Processing
-    ↓
-Intent Recognition
-    ↓
-Tool Selection
-    ↓
-Permission Check
-    ↓
-Tool Execution
-    ↓
-Result Verification
-    ↓
-Response Formatting
-    ↓
-Logging
-```
+- **Phase 1: Core System Architecture & Foundation** — Completed
+- **Phase 2: Voice Intelligence & Audio Pipeline** — Completed
+- **Phase 3: Native PySide6 Desktop GUI Interface** — Completed
+- **Phase 4: LLM Brain & Reasoning Engine** — Completed
+- **Phase 5: Advanced Computer & File Control** — Completed
+- **Phase 6: Web Intelligence & Browser Research Engine** — Completed
+- **Phase 7: Memory, Personal Context & Long-Term Intelligence** — Completed
+- **Phase 8: Vision, Screen Understanding & Visual Context Engine** — Completed
+- **Phase 9: Advanced Autonomous Task Execution Engine** — Completed
+- **Phase 10: Proactive Personal Assistant & Intelligent Automation** — Completed
 
 ---
 

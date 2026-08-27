@@ -81,6 +81,58 @@ CREATE TABLE IF NOT EXISTS task_events (
 );
 """
 
+# Proactive Personal Assistant & Automation Schema (Phase 10)
+CREATE_AUTOMATIONS_TABLE_V4 = """
+CREATE TABLE IF NOT EXISTS automations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    trigger_type TEXT NOT NULL,
+    trigger_config TEXT DEFAULT '{}',
+    condition_config TEXT DEFAULT '{}',
+    action_config TEXT DEFAULT '{}',
+    permissions TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_run_at TEXT DEFAULT NULL,
+    next_run_at TEXT DEFAULT NULL,
+    run_count INTEGER DEFAULT 0,
+    failure_count INTEGER DEFAULT 0
+);
+"""
+
+CREATE_AUTOMATION_RUNS_TABLE_V4 = """
+CREATE TABLE IF NOT EXISTS automation_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    automation_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT 'STARTED',
+    result_summary TEXT DEFAULT '',
+    error_message TEXT DEFAULT '',
+    FOREIGN KEY(automation_id) REFERENCES automations(id) ON DELETE CASCADE
+);
+"""
+
+CREATE_NOTIFICATIONS_TABLE_V4 = """
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'REMINDER',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'NORMAL',
+    source_automation_id TEXT DEFAULT NULL,
+    created_at TEXT NOT NULL,
+    read_at TEXT DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT 'UNREAD'
+);
+"""
+
+CREATE_INDEX_AUTOMATIONS_STATUS = "CREATE INDEX IF NOT EXISTS idx_automations_status ON automations(status);"
+CREATE_INDEX_AUTOMATIONS_NEXT_RUN = "CREATE INDEX IF NOT EXISTS idx_automations_next_run ON automations(next_run_at);"
+CREATE_INDEX_RUNS_AUTOMATION_ID = "CREATE INDEX IF NOT EXISTS idx_runs_automation_id ON automation_runs(automation_id);"
+
 
 def initialize_schema(conn) -> None:
     """Execute schema creation scripts on SQLite connection."""
@@ -95,3 +147,11 @@ def initialize_schema(conn) -> None:
         conn.execute(CREATE_TASK_STEPS_TABLE_V3)
         conn.execute(CREATE_TASK_CHECKPOINTS_TABLE_V3)
         conn.execute(CREATE_TASK_EVENTS_TABLE_V3)
+
+        # Phase 10 Schema
+        conn.execute(CREATE_AUTOMATIONS_TABLE_V4)
+        conn.execute(CREATE_AUTOMATION_RUNS_TABLE_V4)
+        conn.execute(CREATE_NOTIFICATIONS_TABLE_V4)
+        conn.execute(CREATE_INDEX_AUTOMATIONS_STATUS)
+        conn.execute(CREATE_INDEX_AUTOMATIONS_NEXT_RUN)
+        conn.execute(CREATE_INDEX_RUNS_AUTOMATION_ID)

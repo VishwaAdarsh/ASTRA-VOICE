@@ -228,3 +228,34 @@ class ConfirmationRequiredError(TaskEngineError):
     """Raised when a task step requires user confirmation before proceeding."""
 
     pass
+
+
+# Proactive Personal Assistant & Automation Exceptions (Phase 10)
+class AutomationError(AstraError):
+    """Base exception for proactive automation errors."""
+
+    pass
+
+
+class AutomationValidationError(AutomationError):
+    """Raised when an automation rule fails validation or limit checks."""
+
+    pass
+
+
+class AutomationExecutionError(AutomationError):
+    """Raised when an automation action or trigger execution fails."""
+
+    pass
+
+
+class SchedulerError(AutomationError):
+    """Raised when background scheduler management encounters an error."""
+
+    pass
+
+
+class NotificationError(AutomationError):
+    """Raised when notification creation or delivery fails."""
+
+    pass

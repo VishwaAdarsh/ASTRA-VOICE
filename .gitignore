@@ -45,6 +45,9 @@ data/logs/*.log
 data/temp_vision/
 data/screenshots/
 data/*.db
+data/*.db-shm
+data/*.db-wal
+
 
 # Pytest / Coverage
 .pytest_cache/

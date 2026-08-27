@@ -32,9 +32,12 @@ class SystemLifecycle:
         self.logger.info("ASTRA System startup complete. Ready for commands.")
         return agent
 
-    def shutdown(self) -> None:
+    def shutdown(self, agent: "AstraAgent | None" = None) -> None:
         """Perform a clean system shutdown."""
         if self.is_running:
             self.logger.info("Shutting down ASTRA system gracefully...")
+            if agent:
+                agent.shutdown()
             self.is_running = False
             self.logger.info("ASTRA System shutdown complete.")
+

@@ -35,6 +35,8 @@ from src.tools.filesystem import (
     RenameFileTool,
     SearchFilesTool,
 )
+from src.automation.manager import AutomationManager
+from src.automation.notification import NotificationManager
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
 from src.task.manager import TaskManager
@@ -91,6 +93,8 @@ class AstraAgent:
         self.memory_manager = MemoryManager(config=self.config)
         self.vision_manager = VisionManager(config=self.config)
         self.task_manager = TaskManager(config=self.config, registry=self.registry)
+        self.automation_manager = AutomationManager(config=self.config, registry=self.registry, task_manager=self.task_manager)
+        self.notification_manager = self.automation_manager.notification_manager
         self.planner = TaskPlanner()
         self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
         self.executor = executor or ToolExecutor(
@@ -265,7 +269,12 @@ class AstraAgent:
             return f"✓ {result.message}"
         elif result.status == ExecutionStatus.DENIED:
             return f"Permission Denied: {result.message}"
-        elif result.status == ExecutionStatus.NOT_FOUND:
-            return f"Not Found: {result.message}"
         else:
             return f"Action Failed: {result.message}"
+
+    def shutdown(self) -> None:
+        """Shutdown background subsystems and timers."""
+        if hasattr(self, "automation_manager"):
+            self.automation_manager.stop_all_automations()
+
+

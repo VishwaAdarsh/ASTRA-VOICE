@@ -133,6 +133,15 @@ class Config:
         self.agent_timeout = float(os.getenv("AGENT_TIMEOUT", "120.0"))
         self.agent_autonomy_level = os.getenv("AGENT_AUTONOMY_LEVEL", "LEVEL_3").upper()
 
+        # Proactive Personal Assistant & Automation (Phase 10)
+        self.proactive_enabled = os.getenv("PROACTIVE_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.max_automations = int(os.getenv("MAX_AUTOMATIONS", "50"))
+        self.max_active_automations = int(os.getenv("MAX_ACTIVE_AUTOMATIONS", "20"))
+        self.quiet_hours_enabled = os.getenv("QUIET_HOURS_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.quiet_hours_start = os.getenv("QUIET_HOURS_START", "23:00")
+        self.quiet_hours_end = os.getenv("QUIET_HOURS_END", "07:00")
+        self.max_notifications_per_automation_per_day = int(os.getenv("MAX_NOTIFICATIONS_PER_AUTOMATION_PER_DAY", "10"))
+
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""
         return app_name.lower().strip() in self.app_allowlist
