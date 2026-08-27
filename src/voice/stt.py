@@ -8,13 +8,13 @@ from abc import ABC, abstractmethod
 import speech_recognition as sr
 from src.core.exceptions import AstraError
 from src.core.logger import get_logger
-from src.voice.audio import convert_to_wav, normalize_transcript
+from src.voice.audio import calculate_rms, convert_to_wav, normalize_transcript
 
 logger = get_logger()
 
 
 class STTError(AstraError):
-    """Exception raised when Speech-To-Text transcription fails."""
+    """Exception raised when Speech-To-Text transcription fails due to service/network errors."""
 
     pass
 
@@ -37,30 +37,40 @@ class SpeechRecognitionSTTProvider(SpeechToTextProvider):
 
     def transcribe(self, pcm_data: bytes, sample_rate: int = 16000) -> str:
         if not pcm_data:
+            logger.debug("STT received empty PCM buffer. Returning empty transcript.")
+            return ""
+
+        # Calculate RMS energy level of PCM audio
+        rms = calculate_rms(pcm_data)
+        logger.info(f"STT Audio Buffer: {len(pcm_data)} bytes | Sample Rate: {sample_rate}Hz | RMS Energy: {rms:.2f}")
+
+        # Filter out background silence / low energy audio before sending to STT API
+        if rms < 100.0:
+            logger.info(f"Silence/low energy audio detected (RMS: {rms:.2f} < 100.0). Returning empty transcript.")
             return ""
 
         try:
-            wav_bytes = convert_to_wav(pcm_data, sample_rate=sample_rate)
+            wav_bytes = convert_to_wav(pcm_data, sample_rate=sample_rate, channels=1)
             wav_stream = io.BytesIO(wav_bytes)
 
             with sr.AudioFile(wav_stream) as source:
                 audio_data = self.recognizer.record(source)
 
-            logger.info("Sending audio to SpeechRecognition engine...")
+            logger.info(f"Sending audio to SpeechRecognition engine ({self.language})...")
             raw_transcript = self.recognizer.recognize_google(audio_data, language=self.language)
             cleaned = normalize_transcript(raw_transcript)
-            logger.info(f"Transcription successful: '{cleaned}'")
+            logger.info(f"STT Transcription successful: '{cleaned}'")
             return cleaned
 
         except sr.UnknownValueError:
-            logger.warning("STT Engine could not understand audio (UnknownValueError)")
+            logger.info("Speech recognition completed: Audio received but speech could not be decoded (UnknownValueError).")
             return ""
         except sr.RequestError as e:
             logger.error(f"STT Engine API request error: {e}")
             raise STTError(f"STT provider service error: {e}")
         except Exception as e:
             logger.error(f"STT Transcription failed: {e}")
-            raise STTError(f"STT Transcription error: {e}")
+            return ""
 
 
 class MockSTTProvider(SpeechToTextProvider):

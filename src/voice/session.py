@@ -72,7 +72,11 @@ class VoiceSession:
             self.emit_event(VoiceEvent.LISTENING_STARTED)
 
             try:
-                pcm_data = self.mic.record_chunk(duration_seconds=record_seconds)
+                res = self.mic.record_chunk(duration_seconds=record_seconds)
+                if isinstance(res, tuple):
+                    pcm_data, sample_rate = res
+                else:
+                    pcm_data, sample_rate = res, getattr(self.mic.config, "sample_rate", 16000)
             except MicrophoneUnavailableError as mue:
                 logger.error(f"Microphone error: {mue.message}")
                 self._set_state(VoiceState.ERROR, {"error": mue.message})
@@ -87,7 +91,7 @@ class VoiceSession:
             self.emit_event(VoiceEvent.TRANSCRIPTION_STARTED)
 
             try:
-                transcript = self.stt.transcribe(pcm_data)
+                transcript = self.stt.transcribe(pcm_data, sample_rate=sample_rate)
             except STTError as se:
                 logger.error(f"STT error during transcription: {se.message}")
                 self.emit_event(VoiceEvent.VOICE_ERROR, {"error": se.message})
@@ -96,6 +100,7 @@ class VoiceSession:
                 self.tts.speak(error_speech)
                 self._set_state(VoiceState.IDLE)
                 return error_speech, None
+
 
             self.emit_event(VoiceEvent.TRANSCRIPTION_COMPLETED, {"transcript": transcript})
 
