@@ -156,14 +156,21 @@ class TaskRepository:
         with self.db.get_connection() as conn:
             conn.execute(sql, (task_id, event_type, json.dumps(payload or {})))
 
-    def list_tasks(self, limit: int = 20) -> list[Task]:
-        """List recent tasks."""
-        sql = "SELECT id FROM tasks ORDER BY created_at DESC LIMIT ?;"
+    def list_tasks(self, status: TaskStatus | None = None, limit: int = 20) -> list[Task]:
+        """List recent tasks optionally filtered by status."""
+        if status:
+            sql = "SELECT id FROM tasks WHERE status = ? ORDER BY created_at DESC LIMIT ?;"
+            args = (status.value, limit)
+        else:
+            sql = "SELECT id FROM tasks ORDER BY created_at DESC LIMIT ?;"
+            args = (limit,)
+
         tasks = []
         with self.db.get_connection() as conn:
-            rows = conn.execute(sql, (limit,)).fetchall()
+            rows = conn.execute(sql, args).fetchall()
             for r in rows:
                 t = self.get_task(r["id"])
                 if t:
                     tasks.append(t)
         return tasks
+

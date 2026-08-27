@@ -19,9 +19,10 @@ class SchedulerManager:
 
     def __init__(self, config: Config | None = None):
         self.config = config or Config()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._timers: dict[str, threading.Timer] = {}
         self._running = False
+
 
     def is_quiet_hours(self, current_time: datetime.datetime | None = None) -> bool:
         """Check if current time falls within user-configured quiet hours (e.g. 23:00 -> 07:00)."""
