@@ -203,17 +203,17 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
     async def list_tasks():
         if not app.state.agent:
             return []
-        tasks = app.state.agent.task_manager.list_tasks()
+        tasks = app.state.agent.task_manager.list_recent_tasks()
         return [
             {
                 "id": f"tsk-{t.id}",
-                "title": t.description,
+                "title": getattr(t, "goal", getattr(t, "description", "Task")),
                 "status": t.status.value if hasattr(t.status, "value") else str(t.status),
-                "progress": getattr(t, "progress", 100 if t.status.value == "COMPLETED" else 0),
+                "progress": 100 if (hasattr(t.status, "value") and t.status.value == "COMPLETED") else 0,
                 "category": getattr(t, "category", "Development"),
-                "completed": t.status.value == "COMPLETED",
-                "priority": getattr(t, "priority", "high"),
-                "dueDate": t.created_at[:10] if hasattr(t, "created_at") else "Today",
+                "completed": hasattr(t.status, "value") and t.status.value == "COMPLETED",
+                "priority": "high",
+                "dueDate": t.created_at[:10] if hasattr(t, "created_at") and t.created_at else "Today",
             }
             for t in tasks
         ]
@@ -222,11 +222,11 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
     async def create_task(req: TaskRequest):
         if not app.state.agent:
             raise HTTPException(status_code=503, detail="ASTRA Engine agent not initialized")
-        task = await asyncio.to_thread(app.state.agent.task_manager.submit_task, req.goal)
-        await ws_manager.broadcast({"type": "TASK_STARTED", "task_id": task.id, "goal": req.goal})
+        task = await asyncio.to_thread(app.state.agent.task_manager.create_and_execute_goal, req.goal)
+        await ws_manager.broadcast({"type": "TASK_STARTED", "task_id": getattr(task, "task_id", getattr(task, "id", "task_1")), "goal": req.goal})
         return {
-            "id": f"tsk-{task.id}",
-            "title": task.description,
+            "id": f"tsk-{getattr(task, 'task_id', getattr(task, 'id', 'task_1'))}",
+            "title": req.goal,
             "status": task.status.value if hasattr(task.status, "value") else str(task.status),
             "completed": False,
         }
@@ -243,14 +243,15 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
             {
                 "id": f"rem-{a.id}",
                 "title": a.name,
-                "time": a.cron_expression or a.trigger_type,
-                "date": "Active" if a.active else "Paused",
+                "time": a.trigger_config.get("schedule", a.trigger_type.value if hasattr(a.trigger_type, "value") else str(a.trigger_type)),
+                "date": "Active" if (hasattr(a.status, "value") and a.status.value == "ACTIVE") else "Paused",
                 "category": getattr(a, "category", "Work"),
-                "completed": not a.active,
+                "completed": hasattr(a.status, "value") and a.status.value != "ACTIVE",
                 "priority": "high",
             }
             for a in automations
         ]
+
 
     @app.post("/api/v1/automations")
     async def create_automation(req: AutomationRequest):

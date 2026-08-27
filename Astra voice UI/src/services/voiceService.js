@@ -75,11 +75,13 @@ class VoiceService {
   }
 
   startListening({ onInterim, onFinal, onError }) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const isQtWebEngine = typeof navigator !== 'undefined' && /QtWebEngine/i.test(navigator.userAgent);
+    const SpeechRecognition = isQtWebEngine ? null : (window.SpeechRecognition || window.webkitSpeechRecognition);
     if (!SpeechRecognition) {
-      if (onError) onError('Speech recognition is not supported in this browser. You can type prompts directly.');
+      if (onError) onError('Voice input is handled natively by ASTRA Python Engine. You can speak into your microphone or type prompts.');
       return false;
     }
+
 
     try {
       this.initAudioAnalyzer();
