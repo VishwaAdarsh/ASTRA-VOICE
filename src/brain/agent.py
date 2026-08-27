@@ -37,6 +37,10 @@ from src.tools.filesystem import (
 )
 from src.automation.manager import AutomationManager
 from src.automation.notification import NotificationManager
+from src.core.health import HealthManager
+from src.core.recovery import CrashRecoveryManager
+from src.security.auditor import SecurityAuditor
+from src.security.injection import PromptInjectionDefense
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
 from src.task.manager import TaskManager
@@ -88,13 +92,21 @@ class AstraAgent:
         self.permission_manager = permission_manager or PermissionManager(config=self.config)
         self.verifier = ToolVerifier(config=self.config)
 
-        # Initialize Subsystems
+        # Initialize Subsystems (Phases 1-11)
+        self.health_manager = HealthManager(config=self.config)
+        self.security_auditor = SecurityAuditor(config=self.config)
+        self.injection_defense = PromptInjectionDefense(config=self.config, auditor=self.security_auditor)
         self.context_manager = context_manager or ContextManager()
         self.memory_manager = MemoryManager(config=self.config)
         self.vision_manager = VisionManager(config=self.config)
         self.task_manager = TaskManager(config=self.config, registry=self.registry)
         self.automation_manager = AutomationManager(config=self.config, registry=self.registry, task_manager=self.task_manager)
         self.notification_manager = self.automation_manager.notification_manager
+        self.crash_recovery_manager = CrashRecoveryManager(config=self.config, task_manager=self.task_manager, automation_manager=self.automation_manager)
+
+        # Perform startup recovery audit
+        self.crash_recovery_manager.perform_startup_recovery()
+
         self.planner = TaskPlanner()
         self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
         self.executor = executor or ToolExecutor(

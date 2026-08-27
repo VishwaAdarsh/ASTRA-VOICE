@@ -1,15 +1,15 @@
 # ASTRA — Personal AI Assistant for Windows
 
-![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_10_Proactive_Assistant-blue.svg)
+![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_11_Hardened_Production-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 
-ASTRA is an intelligent, voice-enabled, desktop-integrated personal AI assistant designed specifically for Windows. Built with modern Python, PySide6 desktop GUI, Voice Intelligence (STT/TTS/VAD), an extensible LLM Brain reasoning engine, advanced computer & filesystem controls, internet web research capabilities, long-term persistent memory context, vision perception, bounded autonomous task execution, and controlled proactive personal automation.
+ASTRA is an intelligent, voice-enabled, desktop-integrated personal AI assistant designed specifically for Windows. Built with modern Python, PySide6 desktop GUI, Voice Intelligence (STT/TTS/VAD), an extensible LLM Brain reasoning engine, advanced computer & filesystem controls, internet web research capabilities, long-term persistent memory context, vision perception, bounded autonomous task execution, controlled proactive personal automation, and production-grade security, reliability, secret redaction, prompt injection defense, and crash recovery.
 
 ---
 
-## 🚀 Development Status: Phase 10 — Proactive Personal Assistant & Automation Complete
+## 🚀 Development Status: Phase 11 — Security, Reliability & Production Hardening Complete
 
 - **Phase 1: Core System Architecture & Foundation** — Completed
 - **Phase 2: Voice Intelligence & Audio Pipeline** — Completed
@@ -21,6 +21,8 @@ ASTRA is an intelligent, voice-enabled, desktop-integrated personal AI assistant
 - **Phase 8: Vision, Screen Understanding & Visual Context Engine** — Completed
 - **Phase 9: Advanced Autonomous Task Execution Engine** — Completed
 - **Phase 10: Proactive Personal Assistant & Intelligent Automation** — Completed
+- **Phase 11: Security, Reliability & Production Hardening** — Completed
+
 
 ---
 

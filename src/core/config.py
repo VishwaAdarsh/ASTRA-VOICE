@@ -142,6 +142,12 @@ class Config:
         self.quiet_hours_end = os.getenv("QUIET_HOURS_END", "07:00")
         self.max_notifications_per_automation_per_day = int(os.getenv("MAX_NOTIFICATIONS_PER_AUTOMATION_PER_DAY", "10"))
 
+        # Security, Reliability & Production Hardening (Phase 11)
+        self.max_file_size_mb = float(os.getenv("MAX_FILE_SIZE_MB", "10.0"))
+        self.network_timeout = float(os.getenv("NETWORK_TIMEOUT", "15.0"))
+        self.log_max_bytes = int(os.getenv("LOG_MAX_BYTES", str(5 * 1024 * 1024)))  # 5MB
+        self.log_backup_count = int(os.getenv("LOG_BACKUP_COUNT", "3"))
+
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""
         return app_name.lower().strip() in self.app_allowlist
