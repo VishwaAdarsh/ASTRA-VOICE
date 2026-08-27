@@ -1,13 +1,14 @@
 # ASTRA — Personal AI Assistant for Windows
 
-![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_6_Web_Intelligence-blue.svg)
+![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_7_Memory_Subsystem-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
 
-**ASTRA** is a long-term personal AI computer assistant for Windows designed to understand natural language, communicate through voice and text, control authorized computer operations, search the web, manage files, maintain memory, and assist with daily productivity.
+**ASTRA** is a long-term personal AI computer assistant for Windows designed to understand natural language, communicate through voice and text, control authorized computer operations, search the web, manage persistent long-term memory, and assist with daily productivity.
 
-> **Current Phase:** Phase 6 Web Intelligence & Browser Research Engine (Completed).  
-> Phase 6 introduces provider-neutral web search, SSRF/private IP protection, HTML chrome stripping & content extraction, deterministic source ranking, multi-source research synthesis, claim attribution, and numbered source citations ([1], [2]).
+> **Current Phase:** Phase 7 Memory, Personal Context & Long-Term Intelligence (Completed).  
+> Phase 7 introduces local SQLite persistent memory storage (`data/astra_memory.db`), candidate memory extraction, secret filtering (API keys, passwords), preference conflict resolution, query-driven memory retrieval, native PySide6 Desktop GUI Memory Dashboard, and Voice memory commands.
+
 
 
 

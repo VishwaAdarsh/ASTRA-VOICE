@@ -57,7 +57,35 @@ class MockLLMProvider(LLMProvider):
                 usage=usage,
             )
 
+        # 3. Memory Tools (Phase 7)
+        elif "remember that" in text or "remember i" in text:
+            extracted_fact = text.replace("remember that", "").replace("remember", "").strip()
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="remember",
+                arguments={"content": extracted_fact or "User preference stored"},
+                reason="User requested storing memory.",
+                usage=usage,
+            )
+        elif "forget" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="forget_memory",
+                arguments={"target": text.replace("forget", "").strip()},
+                reason="User requested deleting memory.",
+                usage=usage,
+            )
+        elif "what do you remember" in text or "show my memories" in text or "list memories" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="list_memories",
+                arguments={},
+                reason="User requested listing memories.",
+                usage=usage,
+            )
+
         # 4. Web Tools (Phase 6)
+
         elif "search the web" in text or "web search" in text:
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,

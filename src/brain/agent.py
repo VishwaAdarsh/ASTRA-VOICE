@@ -37,6 +37,13 @@ from src.tools.filesystem import (
 )
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
+from src.memory.manager import MemoryManager
+from src.tools.memory import (
+    ForgetMemoryTool,
+    ListMemoriesTool,
+    RememberTool,
+    RetrieveMemoryTool,
+)
 from src.tools.system import (
     ResourceInformationTool,
     ScreenshotTool,
@@ -46,6 +53,7 @@ from src.tools.system import (
 from src.tools.web import FetchWebpageTool, ResearchTopicTool, SearchWebTool
 
 logger = get_logger()
+
 
 
 
@@ -59,6 +67,8 @@ class AstraAgent:
         intent_recognizer: IntentRecognizer | None = None,
         tool_registry: ToolRegistry | None = None,
         permission_manager: PermissionManager | None = None,
+        context_manager: ContextManager | None = None,
+        executor: ToolExecutor | None = None,
     ):
         self.config = config or Config()
         self.fallback_recognizer = intent_recognizer or RuleBasedIntentRecognizer()
@@ -67,14 +77,16 @@ class AstraAgent:
         self.permission_manager = permission_manager or PermissionManager(config=self.config)
         self.verifier = ToolVerifier(config=self.config)
 
-        self.executor = ToolExecutor(
+        # Initialize Subsystems
+        self.context_manager = context_manager or ContextManager()
+        self.memory_manager = MemoryManager(config=self.config)
+        self.planner = TaskPlanner()
+        self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
+        self.executor = executor or ToolExecutor(
             registry=self.registry,
             permission_manager=self.permission_manager,
             verifier=self.verifier,
         )
-
-        # Register standard Phase 1-5 tools
-        self._register_default_tools()
 
         # Initialize Phase 4 LLM Subsystem
         model_config = ModelConfig(
@@ -86,13 +98,14 @@ class AstraAgent:
             api_key=self.config.llm_api_key,
         )
         self.llm_client = LLMClient(config=model_config, provider=llm_provider)
-        self.context_manager = ContextManager()
-        self.planner = TaskPlanner()
-        self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
+
+        # Register standard allowlisted tools
+        self._register_default_tools()
+
 
     def _register_default_tools(self) -> None:
-        """Register Phase 1-5 allowlisted tools."""
-        # Phase 1
+        """Register built-in tool instances across Phase 1, 5, 6 & 7."""
+        # Phase 1 Core Tools
         self.registry.register(OpenApplicationTool(config=self.config))
         self.registry.register(OpenFolderTool(config=self.config))
         self.registry.register(OpenWebsiteTool(config=self.config))
@@ -110,7 +123,7 @@ class AstraAgent:
         self.registry.register(DeleteFileTool(config=self.config))
         self.registry.register(OrganizeFolderTool(config=self.config))
 
-        # Phase 5 Applications & Projects
+        # Phase 5 Applications
         self.registry.register(ApplicationStatusTool(config=self.config))
         self.registry.register(CloseApplicationTool(config=self.config))
         self.registry.register(OpenProjectTool(config=self.config))
@@ -124,6 +137,12 @@ class AstraAgent:
         self.registry.register(SearchWebTool(config=self.config))
         self.registry.register(FetchWebpageTool(config=self.config))
         self.registry.register(ResearchTopicTool(config=self.config))
+
+        # Phase 7 Memory
+        self.registry.register(RememberTool(config=self.config, memory_manager=self.memory_manager))
+        self.registry.register(RetrieveMemoryTool(config=self.config, memory_manager=self.memory_manager))
+        self.registry.register(ForgetMemoryTool(config=self.config, memory_manager=self.memory_manager))
+        self.registry.register(ListMemoriesTool(config=self.config, memory_manager=self.memory_manager))
 
         logger.info(f"Registered {len(self.registry.list_tools())} tools: {self.registry.list_tools()}")
 

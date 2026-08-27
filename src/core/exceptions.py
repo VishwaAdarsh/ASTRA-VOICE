@@ -147,3 +147,28 @@ class SourceValidationError(WebError):
     """Raised when a research claim fails source validation."""
 
     pass
+
+
+# Memory & Personal Context Exceptions (Phase 7)
+class MemoryError(ToolError):
+    """Base exception for memory operations."""
+
+    pass
+
+
+class MemoryNotFoundError(MemoryError):
+    """Raised when a requested memory item is not found."""
+
+    pass
+
+
+class SecretFilteringError(MemoryError):
+    """Raised when a memory candidate is blocked due to secret credential policies."""
+
+    pass
+
+
+class MemoryDatabaseError(MemoryError):
+    """Raised when SQLite database operations fail."""
+
+    pass

@@ -107,6 +107,13 @@ class Config:
         self.max_research_sources = int(os.getenv("MAX_RESEARCH_SOURCES", "8"))
         self.web_cache_ttl_sec = int(os.getenv("WEB_CACHE_TTL_SEC", "3600"))
 
+        # Memory & Personal Context Subsystem (Phase 7)
+        db_rel_path = os.getenv("DATABASE_PATH", "data/astra_memory.db")
+        self.database_path = self.root_dir / db_rel_path
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self.max_retrieved_memories = int(os.getenv("MAX_RETRIEVED_MEMORIES", "10"))
+        self.memory_expiration_days = int(os.getenv("MEMORY_EXPIRATION_DAYS", "30"))
+
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""
         return app_name.lower().strip() in self.app_allowlist
