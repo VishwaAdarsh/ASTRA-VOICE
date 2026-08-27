@@ -5,13 +5,13 @@
                                  A S T R A
                       Personal AI Computer Assistant
                       
-               Understand. Think. Act. Remember. See. Plan.
+                     Understand. Think. Act. Remember. See. Plan.
 ================================================================================
 ```
 
 * **Document Version:** 2.8.0
 * **Status:** Master Blueprint / Single Source of Truth
-* **Current Implementation:** Phase 9 (Advanced Autonomous Task Execution & Agentic Workflows Completed)
+* **Current Implementation:** Phase 9 (Advanced Autonomous Task Execution Engine Completed)
 * **Target Operating System:** Windows 10 / Windows 11
 
 
@@ -531,17 +531,21 @@ Phase 12: ASTRA 1.0 Production Release        [PLANNED]
 
 ### Phase Details
 
-| **Interactive Terminal CLI (`src/interfaces/cli.py`)** | Fully Implemented | Phase 1 | Phase 1 |
-| **Pytest Suite (99 Tests Passing)** | Fully Implemented | Phase 1 - 9 | Phase 1 - 9 |
-| **Voice Subsystem (Microphone, STT, TTS, VAD)** | Fully Implemented | Phase 2 | Phase 2 |
-| **PySide6 Desktop GUI (`src/ui/`)** | Fully Implemented | Phase 3 | Phase 3 |
-| **LLM Reasoning Engine (`src/brain/llm/`)** | Fully Implemented | Phase 4 | Phase 4 |
-| **Filesystem & App Control (`src/tools/`)** | Fully Implemented | Phase 5 | Phase 5 |
-| **Web Research Agent (`src/web/`)** | Fully Implemented | Phase 6 | Phase 6 |
-| **Memory Subsystem (`src/memory/`, `src/database/`)** | Fully Implemented | Phase 7 | Phase 7 |
-| **Vision Subsystem (`src/vision/`)** | Fully Implemented | Phase 8 | Phase 8 |
-| **Task Engine Subsystem (`src/task/`)** | Fully Implemented | Phase 9 | Phase 9 |
-| **Proactive Assistant & Automation** | Not Implemented | Planned | Phase 10 |
+#### Phase 0 — Architecture & Foundation Blueprint
+* **Status:** COMPLETED
+* **Objective:** Establish master design blueprint and permanent engineering principles.
+
+#### Phase 1 — Foundation & Core Proof of Concept (M0)
+* **Status:** COMPLETED
+* **Objective:** Build modular core engine, allowlisted tool registry (`open_application`, `open_folder`, `open_website`, `system_information`), rule-based intent recognition, permission manager, executor, verifier, dual logging, CLI interface, and unit test suite.
+
+#### Phase 2 — Voice Intelligence Layer
+* **Status:** PLANNED NEXT
+* **Objective:** Introduce microphone capture, VAD, STT provider interface, TTS provider interface, voice state machine, and voice session manager without modifying Phase 1 core logic.
+
+#### Phase 3 — Modern Desktop UI
+* **Status:** PLANNED
+* **Objective:** Build PySide6 Fluent desktop interface featuring voice orb, activity stream, system status, and settings panel.
 
 #### Phase 4 — LLM Brain Reasoning Upgrade
 * **Status:** PLANNED
@@ -598,17 +602,17 @@ Phase 12: ASTRA 1.0 Production Release        [PLANNED]
 | **Permission Manager (`SAFE`, `CONFIRM`, `RESTRICTED`)** | Fully Implemented | Phase 1 | Phase 1 |
 | **Tool Executor & Pre/Post Verifier** | Fully Implemented | Phase 1 | Phase 1 |
 | **Interactive Terminal CLI (`src/interfaces/cli.py`)** | Fully Implemented | Phase 1 | Phase 1 |
-| **Pytest Suite (40 Tests Passing)** | Fully Implemented | Phase 1, 2 & 3 | Phase 1, 2 & 3 |
+| **Pytest Suite (99 Tests Passing)** | Fully Implemented | Phase 1 - 9 | Phase 1 - 9 |
 | **Voice Subsystem (Microphone, STT, TTS, VAD)** | Fully Implemented | Phase 2 | Phase 2 |
 | **PySide6 Desktop GUI (`src/ui/`)** | Fully Implemented | Phase 3 | Phase 3 |
-
-| **LLM Reasoning Engine** | Not Implemented | Planned | Phase 4 |
-| **Advanced File & Application Control** | Not Implemented | Planned | Phase 5 |
-| **Web Research Agent** | Not Implemented | Planned | Phase 6 |
-| **Memory & Vector Knowledge Base** | Not Implemented | Planned | Phase 7 |
-| **Vision & Screen Inspector** | Not Implemented | Planned | Phase 8 |
-| **Multi-Step Task Planner** | Not Implemented | Planned | Phase 9 |
+| **LLM Brain Reasoning Engine (`src/brain/llm/`)** | Fully Implemented | Phase 4 | Phase 4 |
+| **Advanced File & Computer Control (`src/tools/`)** | Fully Implemented | Phase 5 | Phase 5 |
+| **Web Intelligence & Research Engine (`src/tools/web/`)** | Fully Implemented | Phase 6 | Phase 6 |
+| **Memory, Personal Context Subsystem (`src/memory/`)** | Fully Implemented | Phase 7 | Phase 7 |
+| **Vision, Screen Understanding Engine (`src/vision/`)** | Fully Implemented | Phase 8 | Phase 8 |
+| **Autonomous Task Execution Engine (`src/task/`)** | Fully Implemented | Phase 9 | Phase 9 |
 | **Proactive Assistant** | Not Implemented | Planned | Phase 10 |
+
 
 ---
 

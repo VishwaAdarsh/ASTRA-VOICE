@@ -43,7 +43,7 @@ ENV/
 data/logs/*.log
 !data/logs/.gitkeep
 data/temp_vision/
-data/astra_memory.db
+data/screenshots/
 data/*.db
 
 # Pytest / Coverage

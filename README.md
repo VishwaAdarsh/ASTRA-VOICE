@@ -4,17 +4,6 @@
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
 
-**ASTRA** is a long-term personal AI computer assistant for Windows designed to understand natural language, communicate through voice and text, control authorized computer operations, search the web, manage persistent long-term memory, perceive and analyze desktop screenshots & active application windows, execute multi-step autonomous agentic tasks, and assist with daily productivity.
-
-> **Current Phase:** Phase 9 Advanced Autonomous Task Execution & Agentic Workflows (Completed).  
-> Phase 9 introduces controlled goal-oriented multi-step task execution, introducing the `TaskEngine` package (`src/task/`), `TaskPlanner` plan generation, `PlanValidator` safety & limits enforcement (`MAX_TASK_STEPS = 20`, `MAX_REPLANS = 5`), `TaskVerifier` empirical evidence checks, `TaskExecutor` bounded execution loops with retries & timeouts (`TASK_TIMEOUT = 120.0s`), `TaskRepository` SQLite persistence (`tasks`, `task_steps`, `task_checkpoints`, `task_events`), Action Risk Gating (`SAFE`, `LOW_RISK`, `MEDIUM_RISK`, `HIGH_RISK`, `DESTRUCTIVE`), Single-Task Concurrency (`MAX_CONCURRENT_TASKS = 1`), prompt-injection defense (`VISUAL_DATA / TOOL_OUTPUT = UNTRUSTED DATA`), and native PySide6 Desktop GUI `TasksPage` dashboard with Progress Stepper, Audit Event Log, and Emergency Stop (`[ STOP ASTRA ]`).
-
-
-
-
-
-
-
 
 
 ---
