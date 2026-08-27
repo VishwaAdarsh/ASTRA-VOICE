@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-surface: #121415;
+    --color-surface-dim: #121415;
+    --color-surface-bright: #38393a;
+    --color-surface-container-lowest: #0c0e0f;
+    --color-surface-container-low: #1a1c1d;
+    --color-surface-container: #1e2021;
+    --color-surface-container-high: #282a2b;
+    --color-surface-container-highest: #333536;
+    --color-on-surface: #e2e2e3;
+    --color-on-surface-variant: #c9c4d8;
+    --color-outline: #938ea1;
+    --color-outline-variant: #484555;
+    --color-primary: #cabeff;
+    --color-primary-custom: #7c5cfc;
+    --color-primary-container: #947dff;
+    --color-on-primary: #32009a;
+    --color-tertiary: #cebdff;
+    --color-secondary: #c8c6c8;
+    --color-secondary-container: #474649;
+    --font-primary: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  font-family: var(--font-primary);
+}
+
+body {
+  background-color: #121415;
+  color: #e2e2e3;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Material Symbols icon support */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+  display: inline-block;
+  user-select: none;
+}
+
+.material-symbols-outlined.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Glassmorphic panel */
+.glass-panel {
+  background: rgba(30, 32, 33, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-pill {
+  background: rgba(30, 32, 33, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-pill:hover {
+  background: rgba(45, 48, 50, 0.75);
+  border-color: rgba(124, 92, 252, 0.3);
+}
+
+/* Glowing effects */
+.orb-glow {
+  box-shadow: 0 0 80px 20px rgba(124, 92, 252, 0.25), 0 0 30px 10px rgba(202, 190, 255, 0.2);
+}
+
+.orb-glow-active {
+  box-shadow: 0 0 120px 40px rgba(124, 92, 252, 0.45), 0 0 50px 15px rgba(202, 190, 255, 0.35);
+}
+
+.orb-glow-speaking {
+  box-shadow: 0 0 140px 50px rgba(155, 127, 237, 0.5), 0 0 60px 20px rgba(206, 189, 255, 0.4);
+}
+
+/* Custom animations */
+@keyframes breathing {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes slow-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes sound-wave {
+  0%, 100% { height: 6px; }
+  50% { height: 28px; }
+}
+
+.animate-breathing {
+  animation: breathing 4s ease-in-out infinite;
+}
+
+.animate-slow-rotate {
+  animation: slow-rotate 20s linear infinite;
+}
+
+.animate-wave-1 { animation: sound-wave 1.2s ease-in-out infinite; }
+.animate-wave-2 { animation: sound-wave 0.9s ease-in-out infinite 0.2s; }
+.animate-wave-3 { animation: sound-wave 1.4s ease-in-out infinite 0.4s; }
+.animate-wave-4 { animation: sound-wave 1.1s ease-in-out infinite 0.1s; }
+.animate-wave-5 { animation: sound-wave 1.3s ease-in-out infinite 0.3s; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+

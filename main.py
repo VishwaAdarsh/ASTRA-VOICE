@@ -1,10 +1,13 @@
 """
 ASTRA — Personal AI Assistant for Windows
-Single Primary Application Entry Point (Phase 12 Final Integration).
+Single Primary Application Entry Point (Master Architecture Migration).
+
+Integrates Python ASTRA Core Engine + FastAPI/WebSocket Server + React Stitch UI WebEngine Shell.
 
 Usage:
-  python main.py             # Launch PySide6 Desktop GUI
+  python main.py             # Launch ASTRA React Stitch Desktop GUI
   python main.py --cli       # Launch Terminal Interactive CLI
+  python main.py --backend   # Launch FastAPI Backend API Server only
   python main.py --version   # Display Version Information
   python main.py --debug     # Launch in Debug Mode
 """
@@ -12,7 +15,10 @@ Usage:
 import argparse
 import signal
 import sys
+import threading
+import time
 from pathlib import Path
+import uvicorn
 
 # Add project root to sys.path
 root_dir = Path(__file__).resolve().parent
@@ -22,15 +28,30 @@ if str(root_dir) not in sys.path:
 from src.core.config import Config
 from src.core.lifecycle import SystemLifecycle
 from src.core.version import __version__, APP_FULL_NAME
+from src.voice.manager import VoiceManager
 
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description=APP_FULL_NAME)
     parser.add_argument("--cli", action="store_true", help="Launch in interactive terminal CLI mode")
+    parser.add_argument("--backend", action="store_true", help="Launch FastAPI backend API server only")
     parser.add_argument("--version", action="store_true", help="Display application version and exit")
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug logging")
+    parser.add_argument("--port", type=int, default=8000, help="Backend API server port (default 8000)")
     return parser.parse_args()
+
+
+def start_server_thread(agent, voice_manager, port: int = 8000):
+    """Run uvicorn FastAPI server in background thread."""
+    from src.api.server import create_app
+
+    app = create_app(agent=agent, voice_manager=voice_manager)
+    config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    server_thread = threading.Thread(target=server.run, daemon=True)
+    server_thread.start()
+    return server, server_thread
 
 
 def main():
@@ -47,6 +68,11 @@ def main():
 
     lifecycle = SystemLifecycle(config=config)
     agent = lifecycle.startup()
+    voice_mgr = VoiceManager(agent=agent)
+
+    # Start FastAPI + WebSocket communication server
+    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=args.port)
+    time.sleep(0.5)  # Give server short moment to bind port
 
     # Register OS signal handlers for graceful shutdown
     def _sig_handler(sig, frame):
@@ -57,34 +83,41 @@ def main():
     signal.signal(signal.SIGINT, _sig_handler)
     signal.signal(signal.SIGTERM, _sig_handler)
 
-    if args.cli:
+    if args.backend:
+        print(f"ASTRA Backend Engine & API Server running on http://127.0.0.1:{args.port}")
+        print("Press Ctrl+C to stop.")
+        try:
+            server_thread.join()
+        finally:
+            lifecycle.shutdown(agent)
+
+    elif args.cli:
         from src.interfaces.cli import InteractiveCLI
         cli = InteractiveCLI(agent=agent)
         try:
             cli.start()
         finally:
             lifecycle.shutdown(agent)
+
     else:
+        # Launch Desktop GUI WebEngine Shell (React Stitch UI)
         try:
             from PySide6.QtWidgets import QApplication
-            from src.ui.controllers.app_controller import AppController
-            from src.ui.main_window import MainWindow
-            from src.ui.theme.manager import ThemeManager
-            from src.voice.manager import VoiceManager
+            from src.ui.web_shell import AstraWebWindow
 
             app = QApplication.instance() or QApplication(sys.argv)
-            theme_mgr = ThemeManager()
-            theme_mgr.apply_theme(app, "dark")
+            app.setApplicationName("ASTRA Personal AI Assistant")
 
-            voice_mgr = VoiceManager(agent=agent)
-            controller = AppController(agent=agent, voice_manager=voice_mgr)
-
-            window = MainWindow(controller=controller)
+            window = AstraWebWindow(server_url=f"http://127.0.0.1:{args.port}")
             window.show()
 
-            sys.exit(app.exec())
+            try:
+                sys.exit(app.exec())
+            finally:
+                lifecycle.shutdown(agent)
+
         except Exception as e:
-            print(f"Warning: Could not launch GUI ({e}). Falling back to interactive CLI interface...")
+            print(f"Warning: Could not launch WebEngine Shell ({e}). Falling back to interactive CLI interface...")
             from src.interfaces.cli import InteractiveCLI
             cli = InteractiveCLI(agent=agent)
             try:
