@@ -197,3 +197,34 @@ class VisionProviderError(VisionError):
     """Raised when vision provider analysis fails or times out."""
 
     pass
+
+
+# Advanced Autonomous Task Execution Exceptions (Phase 9)
+class TaskEngineError(AstraError):
+    """Base exception for autonomous task execution errors."""
+
+    pass
+
+
+class PlanValidationError(TaskEngineError):
+    """Raised when a task plan fails schema or limit validation."""
+
+    pass
+
+
+class TaskExecutionError(TaskEngineError):
+    """Raised when autonomous task step execution fails."""
+
+    pass
+
+
+class TaskCancelledError(TaskEngineError):
+    """Raised when a task is cancelled by user request or emergency stop."""
+
+    pass
+
+
+class ConfirmationRequiredError(TaskEngineError):
+    """Raised when a task step requires user confirmation before proceeding."""
+
+    pass

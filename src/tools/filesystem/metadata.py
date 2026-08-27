@@ -35,9 +35,12 @@ class FileMetadataTool(BaseTool):
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         target_str = str(parameters["target"])
+        location_str = parameters.get("location")
         try:
-            target_path = self.resolver.resolve_file(target_str)
+            base_folder = self.resolver.resolve_folder(location_str) if location_str else None
+            target_path = self.resolver.resolve_file(target_str, base_folder=base_folder)
             if not target_path.exists():
+
                 return ToolResult(
                     status=ExecutionStatus.NOT_FOUND,
                     message=f"File '{target_str}' does not exist.",

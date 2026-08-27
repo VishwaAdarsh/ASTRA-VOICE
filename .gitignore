@@ -42,8 +42,12 @@ ENV/
 # ASTRA logs and data
 data/logs/*.log
 !data/logs/.gitkeep
+data/temp_vision/
+data/astra_memory.db
+data/*.db
 
 # Pytest / Coverage
 .pytest_cache/
 .coverage
 htmlcov/
+

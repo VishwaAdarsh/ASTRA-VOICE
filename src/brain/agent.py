@@ -37,6 +37,7 @@ from src.tools.filesystem import (
 )
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
+from src.task.manager import TaskManager
 from src.memory.manager import MemoryManager
 from src.tools.memory import (
     ForgetMemoryTool,
@@ -89,6 +90,7 @@ class AstraAgent:
         self.context_manager = context_manager or ContextManager()
         self.memory_manager = MemoryManager(config=self.config)
         self.vision_manager = VisionManager(config=self.config)
+        self.task_manager = TaskManager(config=self.config, registry=self.registry)
         self.planner = TaskPlanner()
         self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
         self.executor = executor or ToolExecutor(

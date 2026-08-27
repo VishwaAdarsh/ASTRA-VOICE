@@ -125,6 +125,14 @@ class Config:
         self.max_image_size_mb = float(os.getenv("MAX_IMAGE_SIZE_MB", "5.0"))
         self.visual_context_ttl_sec = int(os.getenv("VISUAL_CONTEXT_TTL_SEC", "300"))
 
+        # Advanced Autonomous Task Execution Engine (Phase 9)
+        self.agent_max_steps = int(os.getenv("AGENT_MAX_STEPS", "20"))
+        self.agent_max_tool_calls = int(os.getenv("AGENT_MAX_TOOL_CALLS", "30"))
+        self.agent_max_replans = int(os.getenv("AGENT_MAX_REPLANS", "5"))
+        self.agent_max_retries = int(os.getenv("AGENT_MAX_RETRIES", "3"))
+        self.agent_timeout = float(os.getenv("AGENT_TIMEOUT", "120.0"))
+        self.agent_autonomy_level = os.getenv("AGENT_AUTONOMY_LEVEL", "LEVEL_3").upper()
+
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""
         return app_name.lower().strip() in self.app_allowlist

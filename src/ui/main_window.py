@@ -14,6 +14,7 @@ from src.ui.pages.assistant import AssistantPage
 from src.ui.pages.dashboard import DashboardPage
 from src.ui.pages.memory import MemoryPage
 from src.ui.pages.settings import SettingsPage
+from src.ui.pages.tasks import TasksPage
 from src.ui.pages.tools import ToolsPage
 from src.ui.pages.vision import VisionPage
 
@@ -58,6 +59,7 @@ class MainWindow(QMainWindow):
         self.tools_page = ToolsPage(self.controller)
         self.memory_page = MemoryPage(memory_manager=self.controller.agent.memory_manager)
         self.vision_page = VisionPage(vision_manager=self.controller.agent.vision_manager)
+        self.tasks_page = TasksPage(task_manager=self.controller.agent.task_manager)
         self.settings_page = SettingsPage(self.controller)
 
         self.page_stack.addWidget(self.dashboard_page)  # Index 0
@@ -66,7 +68,9 @@ class MainWindow(QMainWindow):
         self.page_stack.addWidget(self.tools_page)      # Index 3
         self.page_stack.addWidget(self.memory_page)     # Index 4
         self.page_stack.addWidget(self.vision_page)     # Index 5
-        self.page_stack.addWidget(self.settings_page)   # Index 6
+        self.page_stack.addWidget(self.tasks_page)      # Index 6
+        self.page_stack.addWidget(self.settings_page)   # Index 7
+
 
 
         content_layout.addWidget(self.page_stack)
