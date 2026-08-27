@@ -78,6 +78,10 @@ class Config:
             "reddit": "https://www.reddit.com",
         }
 
+        # Primary ASTRA API Key & Subsystem Credential Integration
+        self.astra_api_key = os.getenv("ASTRA_API_KEY", "93faef10bda772eb4230e8ff1ef37f0e1ca3f3cd")
+        self.voice_api_key = os.getenv("VOICE_API_KEY", self.astra_api_key)
+
         # Voice Subsystem Configuration (Phase 2)
         self.voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("true", "1", "yes")
         self.stt_provider = os.getenv("STT_PROVIDER", "speech_recognition").lower()
@@ -95,11 +99,12 @@ class Config:
         # LLM Brain Configuration (Phase 4)
         self.llm_provider = os.getenv("LLM_PROVIDER", "mock").lower()
         self.llm_model = os.getenv("LLM_MODEL", "mock-astra-v1")
-        self.llm_api_key = os.getenv("LLM_API_KEY", "")
+        self.llm_api_key = os.getenv("LLM_API_KEY", self.astra_api_key)
         self.llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.2"))
         self.llm_max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "512"))
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))
         self.llm_fallback_enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() in ("true", "1", "yes")
+
 
         # Filesystem Controls (Phase 5)
         self.max_search_results = int(os.getenv("MAX_SEARCH_RESULTS", "10"))

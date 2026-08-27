@@ -43,12 +43,14 @@ class VoiceManager:
             tts_rate=self.config.tts_rate,
             tts_volume=self.config.tts_volume,
             voice_language=self.config.voice_language,
+            api_key=self.config.voice_api_key,
             audio=AudioConfig(
                 listen_timeout=self.config.listen_timeout,
                 silence_timeout=self.config.silence_timeout,
                 minimum_speech_duration=self.config.minimum_speech_duration,
             ),
         )
+
 
         # Initialize hardware & providers via factories
         self.mic = MicrophoneManager(audio_config=self.voice_config.audio)

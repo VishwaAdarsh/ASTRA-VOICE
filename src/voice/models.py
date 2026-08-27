@@ -42,7 +42,9 @@ class VoiceConfig:
     tts_rate: int = 175
     tts_volume: float = 1.0
     voice_language: str = "en-US"
+    api_key: str = "93faef10bda772eb4230e8ff1ef37f0e1ca3f3cd"
     audio: AudioConfig = field(default_factory=AudioConfig)
+
 
 
 @dataclass
