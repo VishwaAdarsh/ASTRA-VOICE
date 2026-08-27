@@ -7,9 +7,29 @@
 ================================================================================
 ```
 
+## [2.0.0] - 2026-08-27
+
+### Master Architecture Migration (Google Stitch React 19 UI + Python ASTRA Core Engine)
+
+Merged the official **Google Stitch Design System** (`Astra voice UI` React 19 + Vite + Tailwind CSS) with the Python ASTRA Core Engine via a high-performance FastAPI & WebSocket communication layer and PySide6 WebEngine Shell container.
+
+- **Frontend Integration (`Astra voice UI/`)**:
+  - React 19 + Vite + Tailwind CSS Stitch UI integrated as the primary application interface.
+  - Real-time `WebGLOrb` animated voice motif connecting to backend `VoiceState`.
+  - Views integrated: `HomeScreen`, `ConversationScreen`, `TasksNotesScreen`, `RemindersScreen`, `SettingsScreen`, `DesignSystemScreen`, `ConfirmationBottomSheet`.
+- **Communication Layer (`src/api/server.py`)**:
+  - FastAPI REST API + WebSocket server running on `http://127.0.0.1:8000`.
+  - Exposes endpoints for commands, tasks, automations, memory, vision, settings, health diagnostics, and security confirmation modals.
+  - WebSocket pushes real-time `VOICE_STATE_CHANGED`, `BRAIN_STARTED`, `BRAIN_COMPLETED`, `HEALTH_CHANGED`, and error events.
+- **Desktop Shell (`src/ui/web_shell.py`)**:
+  - PySide6 `QWebEngineView` desktop container presenting the React Stitch UI.
+- **Backend Architecture Preservation**:
+  - 100% of Python ASTRA core engines (`AstraAgent`, `VoiceManager`, `TaskManager`, `AutomationManager`, `MemoryManager`, `VisionManager`, `HealthManager`, `SecurityAuditor`) remain intact.
+
 ## [1.0.0] - 2026-08-27
 
 ### Initial Major Release (ASTRA 1.0)
+
 
 ASTRA 1.0 integrates 12 engineering phases into one unified, voice-enabled, desktop-integrated personal AI assistant platform for Windows.
 
