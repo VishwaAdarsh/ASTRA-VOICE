@@ -1,6 +1,7 @@
 """
-ASTRA Design Tokens.
-Defines cohesive color palettes, typography scales, spacing metrics, and radiuses.
+ASTRA Design Tokens (Stitch Design System Integration).
+Official Design Tokens extracted from Google Stitch Project: Astra Voice Assistant Design System (projects/2218653904695225469).
+Theme Philosophy: "Calm Presence" (Minimalism + Glassmorphism + Dark-Mode-First).
 """
 
 from dataclasses import dataclass
@@ -8,66 +9,84 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ColorPalette:
-    """Color palette tokens for Dark and Light themes."""
+    """Color palette tokens aligned with Stitch 'Calm Presence' design system."""
 
-    bg_main: str
-    bg_card: str
-    bg_sidebar: str
-    bg_hover: str
-    bg_input: str
-    border: str
-    text_primary: str
-    text_secondary: str
-    text_muted: str
-    accent_blue: str
-    accent_emerald: str
-    accent_amber: str
-    accent_rose: str
-    orb_idle: str
-    orb_listening: str
-    orb_processing: str
-    orb_speaking: str
-    orb_error: str
+    bg_main: str                  # #121415 Deep Dark Canvas
+    bg_card: str                  # #1e2021 Surface Container
+    bg_card_low: str              # #1a1c1d Surface Container Low
+    bg_card_high: str             # #282a2b Surface Container High
+    bg_card_highest: str          # #333536 Surface Container Highest
+    bg_sidebar: str               # #0c0e0f Surface Container Lowest
+    bg_hover: str                 # #282a2b Surface Container High
+    bg_input: str                 # #1a1c1d Surface Container Low
+    border: str                   # #484555 Outline Variant
+    border_focus: str             # #7c5cfc Primary Violet Accent
+    text_primary: str             # #e2e2e3 On Surface
+    text_secondary: str           # #c9c4d8 On Surface Variant
+    text_muted: str               # #938ea1 Outline Muted
+    accent_violet: str            # #7c5cfc Living Violet Light Primary
+    accent_violet_container: str  # #947dff Primary Container
+    accent_tertiary: str          # #cebdff Soft Violet Accent
+    accent_emerald: str           # #34d399 Emerald Green (Success)
+    accent_amber: str             # #fbbf24 Amber Yellow (Warning)
+    accent_rose: str              # #ffb4ab Soft Rose (Error)
+    orb_idle: str                 # #7c5cfc 20% opacity violet pulse
+    orb_listening: str            # #947dff Living violet glow
+    orb_processing: str           # #cebdff Rotating gradient blob
+    orb_speaking: str             # #b794fc Pulsing waveform
+    orb_error: str                # #ffb4ab Soft rose glow
 
 
 DARK_PALETTE = ColorPalette(
-    bg_main="#0F172A",       # Slate 900
-    bg_card="#1E293B",       # Slate 800
-    bg_sidebar="#020617",    # Slate 950
-    bg_hover="#334155",      # Slate 700
-    bg_input="#1E293B",      # Slate 800
-    border="#334155",        # Slate 700
-    text_primary="#F8FAFC",  # Slate 50
-    text_secondary="#94A3B8",# Slate 400
-    text_muted="#64748B",    # Slate 500
-    accent_blue="#38BDF8",   # Sky 400
-    accent_emerald="#10B981",# Emerald 500
-    accent_amber="#F59E0B",  # Amber 500
-    accent_rose="#F43F5E",   # Rose 500
-    orb_idle="#38BDF8",      # Sky Blue
-    orb_listening="#10B981", # Emerald Green
-    orb_processing="#F59E0B",# Amber Yellow
-    orb_speaking="#A855F7",  # Purple
-    orb_error="#F43F5E",     # Rose Red
+    bg_main="#121415",
+    bg_card="#1e2021",
+    bg_card_low="#1a1c1d",
+    bg_card_high="#282a2b",
+    bg_card_highest="#333536",
+    bg_sidebar="#0c0e0f",
+    bg_hover="#282a2b",
+    bg_input="#1a1c1d",
+    border="#484555",
+    border_focus="#7c5cfc",
+    text_primary="#e2e2e3",
+    text_secondary="#c9c4d8",
+    text_muted="#938ea1",
+    accent_violet="#7c5cfc",
+    accent_violet_container="#947dff",
+    accent_tertiary="#cebdff",
+    accent_emerald="#34d399",
+    accent_amber="#fbbf24",
+    accent_rose="#ffb4ab",
+    orb_idle="#7c5cfc",
+    orb_listening="#947dff",
+    orb_processing="#cebdff",
+    orb_speaking="#b794fc",
+    orb_error="#ffb4ab",
 )
 
 LIGHT_PALETTE = ColorPalette(
-    bg_main="#F8FAFC",       # Slate 50
-    bg_card="#FFFFFF",       # White
-    bg_sidebar="#F1F5F9",    # Slate 100
-    bg_hover="#E2E8F0",      # Slate 200
-    bg_input="#FFFFFF",      # White
-    border="#CBD5E1",        # Slate 300
-    text_primary="#0F172A",  # Slate 900
-    text_secondary="#475569",# Slate 600
-    text_muted="#94A3B8",    # Slate 400
-    accent_blue="#0284C7",   # Sky 600
-    accent_emerald="#059669",# Emerald 600
-    accent_amber="#D97706",  # Amber 600
-    accent_rose="#E11D48",   # Rose 600
-    orb_idle="#0284C7",
-    orb_listening="#059669",
-    orb_processing="#D97706",
-    orb_speaking="#7E22CE",
-    orb_error="#E11D48",
+    bg_main="#121415",            # Stitch design system is strictly Dark Mode First
+    bg_card="#1e2021",
+    bg_card_low="#1a1c1d",
+    bg_card_high="#282a2b",
+    bg_card_highest="#333536",
+    bg_sidebar="#0c0e0f",
+    bg_hover="#282a2b",
+    bg_input="#1a1c1d",
+    border="#484555",
+    border_focus="#7c5cfc",
+    text_primary="#e2e2e3",
+    text_secondary="#c9c4d8",
+    text_muted="#938ea1",
+    accent_violet="#7c5cfc",
+    accent_violet_container="#947dff",
+    accent_tertiary="#cebdff",
+    accent_emerald="#34d399",
+    accent_amber="#fbbf24",
+    accent_rose="#ffb4ab",
+    orb_idle="#7c5cfc",
+    orb_listening="#947dff",
+    orb_processing="#cebdff",
+    orb_speaking="#b794fc",
+    orb_error="#ffb4ab",
 )

@@ -1,5 +1,5 @@
 """
-Activity Log Page Component.
+Activity Log Page Component (Stitch Design System Integration).
 Displays chronological execution history and diagnostic details.
 """
 
@@ -9,20 +9,20 @@ from src.ui.controllers.app_controller import AppController
 
 
 class ActivityPage(QWidget):
-    """Activity Log View."""
+    """Activity Log View matching Stitch design system."""
 
     def __init__(self, controller: AppController, parent: QWidget | None = None):
         super().__init__(parent)
         self.controller = controller
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(20)
 
         title = QLabel("Activity History")
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #F8FAFC;")
+        title.setStyleSheet("font-size: 24px; font-weight: 700; color: #e2e2e3;")
         subtitle = QLabel("Traceable audit log of command receipts, tool selections, and execution results.")
-        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        subtitle.setStyleSheet("font-size: 14px; color: #938ea1;")
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -31,18 +31,20 @@ class ActivityPage(QWidget):
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("""
             QListWidget {
-                background-color: #1E293B;
-                border: 1px solid #334155;
-                border-radius: 10px;
-                padding: 10px;
+                background-color: #1a1c1d;
+                border: 1px solid #484555;
+                border-radius: 16px;
+                padding: 12px;
+                color: #e2e2e3;
+                font-size: 14px;
             }
             QListWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #334155;
-                border-radius: 6px;
+                padding: 12px 16px;
+                border-bottom: 1px solid #282a2b;
+                border-radius: 8px;
             }
             QListWidget::item:hover {
-                background-color: #334155;
+                background-color: #282a2b;
             }
         """)
 

@@ -1,6 +1,6 @@
 """
-Vision & Screen Understanding Page Component (Phase 8).
-Native PySide6 view for capturing, viewing, inspecting OCR text, and analyzing desktop visuals.
+Vision & Screen Understanding Page Component (Stitch Design System Integration).
+Connects to Phase 8 VisionManager for desktop screen capture, window inspection, OCR text, and visual element view.
 """
 
 from PySide6.QtCore import Qt
@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -22,29 +21,28 @@ from src.core.logger import get_logger
 from src.vision.context.manager import VisionManager
 from src.vision.types import VisualContext
 
-
 logger = get_logger()
 
 
 class VisionPage(QWidget):
-    """Interactive Vision Dashboard for screen capture, active window analysis, OCR, and element view."""
+    """Interactive Vision Dashboard matching Stitch design system."""
 
     def __init__(self, vision_manager: VisionManager | None = None, parent: QWidget | None = None):
         super().__init__(parent)
         self.vision_manager = vision_manager or VisionManager()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(20)
 
         # Header & Action Buttons
         header_layout = QHBoxLayout()
 
-        title_lbl = QLabel("👁️ Vision & Screen Understanding")
-        title_lbl.setStyleSheet("font-size: 22px; font-weight: bold; color: #38BDF8;")
+        title_lbl = QLabel("👁️ Vision & Screen Inspector")
+        title_lbl.setStyleSheet("font-size: 24px; font-weight: 700; color: #e2e2e3;")
 
         mode_lbl = QLabel("Mode: Perception Only (No Auto-Click)")
-        mode_lbl.setStyleSheet("font-size: 12px; color: #10B981; font-weight: bold; background: #064E3B; padding: 4px 8px; border-radius: 4px;")
+        mode_lbl.setStyleSheet("font-size: 13px; color: #34d399; font-weight: 700; background: #1a1c1d; border: 1px solid #34d399; padding: 6px 12px; border-radius: 16px;")
 
         header_layout.addWidget(title_lbl)
         header_layout.addStretch()
@@ -55,18 +53,16 @@ class VisionPage(QWidget):
         btn_layout.setSpacing(12)
 
         win_btn = QPushButton("📷 Analyze Active Window")
-        win_btn.setFixedHeight(36)
-        win_btn.setStyleSheet("background: #0284C7; color: white; font-weight: bold; border-radius: 6px; padding: 0 16px;")
+        win_btn.setFixedHeight(44)
         win_btn.clicked.connect(self._on_analyze_window)
 
         screen_btn = QPushButton("🖥️ Analyze Full Screen")
-        screen_btn.setFixedHeight(36)
-        screen_btn.setStyleSheet("background: #6366F1; color: white; font-weight: bold; border-radius: 6px; padding: 0 16px;")
+        screen_btn.setFixedHeight(44)
         screen_btn.clicked.connect(self._on_analyze_screen)
 
         img_btn = QPushButton("📁 Open Image File")
-        img_btn.setFixedHeight(36)
-        img_btn.setStyleSheet("background: #334155; color: white; font-weight: bold; border-radius: 6px; padding: 0 16px;")
+        img_btn.setFixedHeight(44)
+        img_btn.setObjectName("IconButton")
         img_btn.clicked.connect(self._on_open_image)
 
         btn_layout.addWidget(win_btn)
@@ -76,7 +72,7 @@ class VisionPage(QWidget):
 
         # Content Split Layout (Left: Preview & Summary; Right: OCR & Elements)
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(16)
+        content_layout.setSpacing(20)
 
         # Left Panel (Preview Thumbnail & Description)
         left_panel = QVBoxLayout()
@@ -86,12 +82,12 @@ class VisionPage(QWidget):
         p_layout = QVBoxLayout(preview_card)
 
         p_title = QLabel("Screenshot Preview")
-        p_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #94A3B8;")
+        p_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #938ea1;")
 
         self.img_lbl = QLabel("No visual capture loaded")
         self.img_lbl.setAlignment(Qt.AlignCenter)
         self.img_lbl.setMinimumSize(320, 200)
-        self.img_lbl.setStyleSheet("border: 1px dashed #475569; border-radius: 8px; color: #64748B;")
+        self.img_lbl.setStyleSheet("border: 1px dashed #484555; border-radius: 12px; color: #938ea1;")
 
         p_layout.addWidget(p_title)
         p_layout.addWidget(self.img_lbl)
@@ -101,12 +97,12 @@ class VisionPage(QWidget):
         d_layout = QVBoxLayout(desc_card)
 
         d_title = QLabel("Visual Findings")
-        d_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8;")
+        d_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #7c5cfc;")
 
         self.desc_text = QTextEdit()
         self.desc_text.setReadOnly(True)
         self.desc_text.setPlaceholderText("Visual analysis output will appear here...")
-        self.desc_text.setStyleSheet("background: #0F172A; border: none; color: #F8FAFC; font-size: 13px;")
+        self.desc_text.setStyleSheet("background: #1a1c1d; border: none; border-radius: 12px; color: #e2e2e3; font-size: 14px; padding: 12px;")
 
         d_layout.addWidget(d_title)
         d_layout.addWidget(self.desc_text)
@@ -122,12 +118,12 @@ class VisionPage(QWidget):
         o_layout = QVBoxLayout(ocr_card)
 
         o_title = QLabel("Extracted OCR Text")
-        o_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #F59E0B;")
+        o_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #fbbf24;")
 
         self.ocr_text = QTextEdit()
         self.ocr_text.setReadOnly(True)
         self.ocr_text.setPlaceholderText("OCR extracted text...")
-        self.ocr_text.setStyleSheet("background: #0F172A; border: none; color: #E2E8F0; font-size: 12px;")
+        self.ocr_text.setStyleSheet("background: #1a1c1d; border: none; border-radius: 12px; color: #c9c4d8; font-size: 13px; padding: 12px;")
 
         o_layout.addWidget(o_title)
         o_layout.addWidget(self.ocr_text)
@@ -137,11 +133,11 @@ class VisionPage(QWidget):
         e_layout = QVBoxLayout(elem_card)
 
         e_title = QLabel("Detected UI Elements")
-        e_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #10B981;")
+        e_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #34d399;")
 
         self.elem_table = QTableWidget(0, 3)
         self.elem_table.setHorizontalHeaderLabels(["Type", "Label", "Bounds"])
-        self.elem_table.setStyleSheet("QTableWidget { background: #0F172A; color: white; border: none; gridline-color: #334155; }")
+        self.elem_table.setStyleSheet("QTableWidget { background: #1a1c1d; color: #e2e2e3; border: none; border-radius: 12px; gridline-color: #484555; }")
 
         e_layout.addWidget(e_title)
         e_layout.addWidget(self.elem_table)

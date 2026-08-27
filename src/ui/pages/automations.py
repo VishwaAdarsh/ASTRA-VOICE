@@ -1,6 +1,7 @@
 """
-Proactive Automations & Reminders Page Component (Phase 10).
-Native PySide6 view for managing proactive automations, reminders, quiet hours, notifications, and emergency stop.
+Proactive Automations & Reminders Page Component (Stitch Design System Integration).
+Aligns with Stitch "Reminders List" design screen.
+Connects to Phase 10 AutomationManager, background scheduler, and NotificationManager.
 """
 
 from PySide6.QtCore import Qt
@@ -12,45 +13,43 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
-from src.core.logger import get_logger
 from src.automation.manager import AutomationManager
-from src.automation.models import Automation, AutomationStatus, Notification
+from src.automation.models import AutomationStatus
+from src.core.logger import get_logger
 
 logger = get_logger()
 
 
 class AutomationsPage(QWidget):
-    """Interactive Proactive Automations & Notifications Center."""
+    """Interactive Proactive Automations & Reminders Center matching Stitch design system."""
 
     def __init__(self, automation_manager: AutomationManager | None = None, parent: QWidget | None = None):
         super().__init__(parent)
         self.automation_manager = automation_manager or AutomationManager()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(28, 28, 28, 28)
+        layout.setSpacing(20)
 
         # Header & Emergency Stop
         header_layout = QHBoxLayout()
 
         title_lbl = QLabel("⏰ Proactive Automations & Reminders")
-        title_lbl.setStyleSheet("font-size: 22px; font-weight: bold; color: #38BDF8;")
+        title_lbl.setStyleSheet("font-size: 24px; font-weight: 700; color: #e2e2e3;")
 
         self.stop_btn = QPushButton("🛑 STOP ALL AUTOMATIONS")
-        self.stop_btn.setFixedHeight(38)
-        self.stop_btn.setStyleSheet("background: #DC2626; color: white; font-size: 13px; font-weight: bold; border-radius: 6px; padding: 0 18px;")
+        self.stop_btn.setFixedHeight(44)
+        self.stop_btn.setStyleSheet("background: #ffb4ab; color: #690005; font-size: 14px; font-weight: 700; border-radius: 22px; padding: 0 22px;")
         self.stop_btn.clicked.connect(self._on_emergency_stop)
 
         header_layout.addWidget(title_lbl)
         header_layout.addStretch()
         header_layout.addWidget(self.stop_btn)
 
-        # Quick Creation Card
+        # Quick Creation Card (Stitch Pill Input)
         create_card = QFrame()
         create_card.setProperty("class", "CardWidget")
         c_layout = QHBoxLayout(create_card)
@@ -58,12 +57,10 @@ class AutomationsPage(QWidget):
         c_layout.setSpacing(12)
 
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Create proactive automation (e.g. 'Remind me tomorrow at 9 AM to submit report')...")
-        self.input_field.setStyleSheet("background: #0F172A; border: 1px solid #334155; border-radius: 6px; color: white; padding: 8px 12px; font-size: 13px;")
+        self.input_field.setPlaceholderText("Create reminder/automation (e.g. 'Remind me tomorrow at 9 AM to review project')...")
 
         create_btn = QPushButton("➕ Create Automation")
-        create_btn.setFixedHeight(36)
-        create_btn.setStyleSheet("background: #0284C7; color: white; font-weight: bold; border-radius: 6px; padding: 0 18px;")
+        create_btn.setFixedHeight(44)
         create_btn.clicked.connect(self._on_create_automation)
 
         c_layout.addWidget(self.input_field, stretch=1)
@@ -71,7 +68,7 @@ class AutomationsPage(QWidget):
 
         # Split Layout (Left: Automations List; Right: Notifications Center)
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(16)
+        content_layout.setSpacing(20)
 
         # Left Panel (Automations List)
         left_card = QFrame()
@@ -79,10 +76,10 @@ class AutomationsPage(QWidget):
         l_layout = QVBoxLayout(left_card)
 
         l_title = QLabel("Active Automations & Schedules")
-        l_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38BDF8;")
+        l_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #7c5cfc;")
 
         self.auto_list = QListWidget()
-        self.auto_list.setStyleSheet("background: #0F172A; color: white; border: none; font-size: 13px;")
+        self.auto_list.setStyleSheet("background: #1a1c1d; color: #e2e2e3; border: none; border-radius: 12px; font-size: 14px; padding: 8px;")
 
         l_layout.addWidget(l_title)
         l_layout.addWidget(self.auto_list)
@@ -93,10 +90,10 @@ class AutomationsPage(QWidget):
         r_layout = QVBoxLayout(right_card)
 
         r_title = QLabel("Notifications Center")
-        r_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #F59E0B;")
+        r_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #fbbf24;")
 
         self.notif_list = QListWidget()
-        self.notif_list.setStyleSheet("background: #0F172A; color: white; border: none; font-size: 13px;")
+        self.notif_list.setStyleSheet("background: #1a1c1d; color: #e2e2e3; border: none; border-radius: 12px; font-size: 14px; padding: 8px;")
 
         r_layout.addWidget(r_title)
         r_layout.addWidget(self.notif_list)

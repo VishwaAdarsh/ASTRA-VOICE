@@ -1,35 +1,39 @@
 """
-Qt QSS Stylesheet Generator for ASTRA UI.
+Qt QSS Stylesheet Generator for ASTRA UI (Stitch Design System Integration).
+Generates Qt QSS matching the Google Stitch "Calm Presence" aesthetic.
 """
 
 from src.ui.theme.tokens import ColorPalette
 
 
 def generate_stylesheet(p: ColorPalette) -> str:
-    """Generate global Qt QSS stylesheet string for the given palette."""
+    """Generate global Qt QSS stylesheet string for the Stitch design system."""
     return f"""
     QMainWindow, QWidget {{
         background-color: {p.bg_main};
         color: {p.text_primary};
-        font-family: 'Segoe UI', 'Segoe UI Variable', system-ui, sans-serif;
-        font-size: 13px;
+        font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
     }}
 
-    /* Sidebar Navigation */
+    /* Sidebar Navigation (Stitch Glassmorphism Container) */
     #Sidebar {{
         background-color: {p.bg_sidebar};
         border-right: 1px solid {p.border};
+        padding: 16px 8px;
     }}
 
     #SidebarButton {{
         background-color: transparent;
         color: {p.text_secondary};
         border: none;
-        border-radius: 8px;
-        padding: 10px 16px;
+        border-radius: 20px;
+        padding: 12px 18px;
         text-align: left;
         font-size: 14px;
         font-weight: 500;
+        margin-bottom: 4px;
     }}
 
     #SidebarButton:hover {{
@@ -39,49 +43,55 @@ def generate_stylesheet(p: ColorPalette) -> str:
 
     #SidebarButton:checked {{
         background-color: {p.bg_card};
-        color: {p.accent_blue};
+        color: {p.accent_violet};
         font-weight: 600;
+        border: 1px solid rgba(124, 92, 254, 0.35);
     }}
 
-    /* Cards & Containers */
+    /* Cards & Containers (Stitch Glassmorphic Tonal Surface) */
     .CardWidget {{
         background-color: {p.bg_card};
         border: 1px solid {p.border};
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 16px;
+        padding: 20px;
     }}
 
-    /* Input Controls */
+    /* Input Controls (Stitch Pill Rounded Fields) */
     QLineEdit, QTextEdit {{
         background-color: {p.bg_input};
         color: {p.text_primary};
         border: 1px solid {p.border};
-        border-radius: 8px;
-        padding: 10px 14px;
-        selection-background-color: {p.accent_blue};
+        border-radius: 28px;
+        padding: 14px 22px;
+        font-size: 15px;
+        selection-background-color: {p.accent_violet};
     }}
 
     QLineEdit:focus, QTextEdit:focus {{
-        border: 1px solid {p.accent_blue};
+        border: 1px solid {p.accent_violet};
+        background-color: {p.bg_card};
     }}
 
-    /* Primary Action Buttons */
+    /* Primary Action Buttons (Stitch Pill Buttons) */
     QPushButton {{
-        background-color: {p.accent_blue};
+        background-color: {p.accent_violet};
         color: #FFFFFF;
         border: none;
-        border-radius: 8px;
-        padding: 10px 18px;
+        border-radius: 28px;
+        padding: 12px 24px;
+        font-size: 15px;
         font-weight: 600;
+        min-height: 44px;
     }}
 
     QPushButton:hover {{
-        background-color: {p.bg_hover};
-        color: {p.text_primary};
+        background-color: {p.accent_violet_container};
+        color: #FFFFFF;
     }}
 
     QPushButton:pressed {{
-        opacity: 0.8;
+        background-color: {p.accent_violet};
+        opacity: 0.9;
     }}
 
     /* Secondary / Icon Buttons */
@@ -89,12 +99,30 @@ def generate_stylesheet(p: ColorPalette) -> str:
         background-color: {p.bg_card};
         color: {p.text_primary};
         border: 1px solid {p.border};
-        border-radius: 8px;
-        padding: 8px;
+        border-radius: 20px;
+        padding: 10px;
+        min-height: 40px;
     }}
 
     QPushButton#IconButton:hover {{
         background-color: {p.bg_hover};
+        border-color: {p.accent_violet};
+    }}
+
+    /* Quick Action Chips (Stitch Rounded Pill Chips) */
+    QPushButton#ChipButton {{
+        background-color: {p.bg_card_high};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        border-radius: 20px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+    }}
+
+    QPushButton#ChipButton:hover {{
+        background-color: {p.bg_card_highest};
+        border-color: {p.accent_violet};
     }}
 
     /* Scrollbars */
@@ -107,7 +135,7 @@ def generate_stylesheet(p: ColorPalette) -> str:
     QScrollBar::handle:vertical {{
         background: {p.border};
         border-radius: 4px;
-        min-height: 20px;
+        min-height: 24px;
     }}
 
     QScrollBar::handle:vertical:hover {{
@@ -119,6 +147,7 @@ def generate_stylesheet(p: ColorPalette) -> str:
         background-color: {p.bg_sidebar};
         border-top: 1px solid {p.border};
         color: {p.text_secondary};
-        font-size: 12px;
+        font-size: 13px;
+        padding: 6px 16px;
     }}
     """

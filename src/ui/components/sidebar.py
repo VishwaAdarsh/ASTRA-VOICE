@@ -1,5 +1,6 @@
 """
-Fluent Sidebar Navigation Component.
+Fluent Sidebar Navigation Component (Stitch Design System Integration).
+Pill-shaped glassmorphic desktop navigation matching the "Calm Presence" aesthetic.
 """
 
 from PySide6.QtCore import Signal, Qt
@@ -8,9 +9,9 @@ from src.ui.theme.tokens import DARK_PALETTE
 
 
 class SidebarNav(QFrame):
-    """Sidebar navigation panel."""
+    """Sidebar navigation panel matching Stitch design system."""
 
-    sig_page_selected = Signal(int)  # Page index signal
+    sig_page_selected = Signal(int)
 
     NAV_ITEMS = [
         ("Dashboard", 0),
@@ -24,23 +25,20 @@ class SidebarNav(QFrame):
         ("Settings", 8),
     ]
 
-
-
-
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedWidth(200)
+        self.setFixedWidth(220)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 20, 12, 20)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 24, 16, 24)
+        layout.setSpacing(6)
 
         # ASTRA Header Branding
         brand_label = QLabel("ASTRA")
-        brand_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #38BDF8; letter-spacing: 2px;")
-        subtitle = QLabel("AI Computer Assistant")
-        subtitle.setStyleSheet("font-size: 11px; color: #94A3B8; margin-bottom: 20px;")
+        brand_label.setStyleSheet("font-size: 22px; font-weight: 700; color: #7c5cfc; letter-spacing: 2px;")
+        subtitle = QLabel("Personal AI Assistant")
+        subtitle.setStyleSheet("font-size: 12px; color: #938ea1; margin-bottom: 24px;")
 
         layout.addWidget(brand_label)
         layout.addWidget(subtitle)
@@ -48,7 +46,7 @@ class SidebarNav(QFrame):
         # Navigation Buttons
         self.buttons: list[QPushButton] = []
         for title, index in self.NAV_ITEMS:
-            btn = QPushButton(title)
+            btn = QPushButton(f"  {title}")
             btn.setObjectName("SidebarButton")
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)

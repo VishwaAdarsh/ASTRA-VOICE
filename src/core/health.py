@@ -66,6 +66,11 @@ class HealthManager:
         """Get complete health status map for all subsystems."""
         return self._health.copy()
 
+    def get_health_status(self) -> dict[str, SubsystemHealth]:
+        """Get complete health status map for all subsystems."""
+        return self.get_all_health()
+
+
     def is_overall_healthy(self) -> bool:
         """Check if all subsystems are operational without UNAVAILABLE critical failures."""
         return all(h.status != HealthStatus.UNAVAILABLE for h in self._health.values())
