@@ -29,6 +29,10 @@ class Config:
         self.screenshots_dir = self.root_dir / "data" / "screenshots"
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
 
+        # Vision Subsystem Temporary Directory (Phase 8)
+        self.temp_vision_dir = self.root_dir / "data" / "temp_vision"
+        self.temp_vision_dir.mkdir(parents=True, exist_ok=True)
+
         self.permissions_mode = os.getenv("PERMISSIONS_MODE", "NORMAL").upper()
 
         # Application mapping allowlist for Windows
@@ -113,6 +117,13 @@ class Config:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self.max_retrieved_memories = int(os.getenv("MAX_RETRIEVED_MEMORIES", "10"))
         self.memory_expiration_days = int(os.getenv("MEMORY_EXPIRATION_DAYS", "30"))
+
+        # Vision, Screen Understanding & Visual Context (Phase 8)
+        self.vision_provider = os.getenv("VISION_PROVIDER", "mock").lower()
+        self.ocr_provider = os.getenv("OCR_PROVIDER", "mock").lower()
+        self.vision_timeout = float(os.getenv("VISION_TIMEOUT", "10.0"))
+        self.max_image_size_mb = float(os.getenv("MAX_IMAGE_SIZE_MB", "5.0"))
+        self.visual_context_ttl_sec = int(os.getenv("VISUAL_CONTEXT_TTL_SEC", "300"))
 
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""

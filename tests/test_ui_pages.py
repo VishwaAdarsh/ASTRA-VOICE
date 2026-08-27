@@ -21,7 +21,8 @@ def test_main_window_navigation_and_pages():
 
     window = MainWindow(controller=controller)
     assert window.windowTitle() == "ASTRA - Personal AI Assistant"
-    assert window.page_stack.count() == 6
+    assert window.page_stack.count() == 7
+
 
     # Test navigation switches page stack index
     window._on_page_selected(1)

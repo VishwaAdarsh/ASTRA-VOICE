@@ -57,7 +57,42 @@ class MockLLMProvider(LLMProvider):
                 usage=usage,
             )
 
+        # 2. Vision Tools (Phase 8)
+        elif "look at my screen" in text or "what is on my screen" in text or "analyze screen" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="analyze_screen",
+                arguments={},
+                reason="User requested desktop screen visual analysis.",
+                usage=usage,
+            )
+        elif "active window" in text or "what application is open" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="analyze_active_window",
+                arguments={},
+                reason="User requested active window visual analysis.",
+                usage=usage,
+            )
+        elif "read screen text" in text or "read text" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="read_screen_text",
+                arguments={},
+                reason="User requested OCR text extraction.",
+                usage=usage,
+            )
+        elif "analyze image" in text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="analyze_image",
+                arguments={"image_path": "data/screenshots/test.png"},
+                reason="User requested image analysis.",
+                usage=usage,
+            )
+
         # 3. Memory Tools (Phase 7)
+
         elif "remember that" in text or "remember i" in text:
             extracted_fact = text.replace("remember that", "").replace("remember", "").strip()
             return LLMDecision(

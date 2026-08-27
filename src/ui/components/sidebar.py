@@ -18,8 +18,10 @@ class SidebarNav(QFrame):
         ("Activity", 2),
         ("Tools", 3),
         ("Memory", 4),
-        ("Settings", 5),
+        ("Vision", 5),
+        ("Settings", 6),
     ]
+
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)

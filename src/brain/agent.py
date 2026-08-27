@@ -50,9 +50,17 @@ from src.tools.system import (
     SystemInformationTool,
     VolumeControlTool,
 )
+from src.tools.vision import (
+    AnalyzeActiveWindowTool,
+    AnalyzeImageTool,
+    AnalyzeScreenTool,
+    ReadScreenTextTool,
+)
 from src.tools.web import FetchWebpageTool, ResearchTopicTool, SearchWebTool
+from src.vision.context.manager import VisionManager
 
 logger = get_logger()
+
 
 
 
@@ -80,6 +88,7 @@ class AstraAgent:
         # Initialize Subsystems
         self.context_manager = context_manager or ContextManager()
         self.memory_manager = MemoryManager(config=self.config)
+        self.vision_manager = VisionManager(config=self.config)
         self.planner = TaskPlanner()
         self.plan_validator = PlanValidator(registry=self.registry, permission_manager=self.permission_manager)
         self.executor = executor or ToolExecutor(
@@ -102,9 +111,8 @@ class AstraAgent:
         # Register standard allowlisted tools
         self._register_default_tools()
 
-
     def _register_default_tools(self) -> None:
-        """Register built-in tool instances across Phase 1, 5, 6 & 7."""
+        """Register built-in tool instances across Phase 1, 5, 6, 7 & 8."""
         # Phase 1 Core Tools
         self.registry.register(OpenApplicationTool(config=self.config))
         self.registry.register(OpenFolderTool(config=self.config))
@@ -144,7 +152,14 @@ class AstraAgent:
         self.registry.register(ForgetMemoryTool(config=self.config, memory_manager=self.memory_manager))
         self.registry.register(ListMemoriesTool(config=self.config, memory_manager=self.memory_manager))
 
+        # Phase 8 Vision
+        self.registry.register(AnalyzeScreenTool(config=self.config, vision_manager=self.vision_manager))
+        self.registry.register(AnalyzeActiveWindowTool(config=self.config, vision_manager=self.vision_manager))
+        self.registry.register(AnalyzeImageTool(config=self.config, vision_manager=self.vision_manager))
+        self.registry.register(ReadScreenTextTool(config=self.config, vision_manager=self.vision_manager))
+
         logger.info(f"Registered {len(self.registry.list_tools())} tools: {self.registry.list_tools()}")
+
 
 
 

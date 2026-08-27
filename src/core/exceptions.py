@@ -172,3 +172,28 @@ class MemoryDatabaseError(MemoryError):
     """Raised when SQLite database operations fail."""
 
     pass
+
+
+# Vision, Screen Understanding & Visual Context Exceptions (Phase 8)
+class VisionError(ToolError):
+    """Base exception for vision operations."""
+
+    pass
+
+
+class ScreenCaptureError(VisionError):
+    """Raised when screen or window capture fails."""
+
+    pass
+
+
+class OCRError(VisionError):
+    """Raised when optical character recognition processing fails."""
+
+    pass
+
+
+class VisionProviderError(VisionError):
+    """Raised when vision provider analysis fails or times out."""
+
+    pass
