@@ -1,239 +1,68 @@
 # ASTRA — Personal AI Assistant for Windows
 
-![ASTRA Assistant](https://img.shields.io/badge/ASTRA-Phase_11_Hardened_Production-blue.svg)
+![ASTRA Assistant](https://img.shields.io/badge/ASTRA-v1.0.0_Release-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 
-ASTRA is an intelligent, voice-enabled, desktop-integrated personal AI assistant designed specifically for Windows. Built with modern Python, PySide6 desktop GUI, Voice Intelligence (STT/TTS/VAD), an extensible LLM Brain reasoning engine, advanced computer & filesystem controls, internet web research capabilities, long-term persistent memory context, vision perception, bounded autonomous task execution, controlled proactive personal automation, and production-grade security, reliability, secret redaction, prompt injection defense, and crash recovery.
+**ASTRA** is an intelligent, voice-enabled, desktop-integrated personal AI assistant designed specifically for Windows. Built with modern Python, PySide6 desktop GUI, Voice Intelligence (STT/TTS/VAD), an extensible LLM Brain reasoning engine, advanced computer & filesystem controls, internet web research capabilities, long-term persistent memory context, vision perception, bounded autonomous task execution, controlled proactive personal automation, and production-grade security, secret redaction, prompt injection defense, and crash recovery.
 
 ---
 
-## 🚀 Development Status: Phase 11 — Security, Reliability & Production Hardening Complete
+## 🚀 Quick Start
 
-- **Phase 1: Core System Architecture & Foundation** — Completed
-- **Phase 2: Voice Intelligence & Audio Pipeline** — Completed
-- **Phase 3: Native PySide6 Desktop GUI Interface** — Completed
-- **Phase 4: LLM Brain & Reasoning Engine** — Completed
-- **Phase 5: Advanced Computer & File Control** — Completed
-- **Phase 6: Web Intelligence & Browser Research Engine** — Completed
-- **Phase 7: Memory, Personal Context & Long-Term Intelligence** — Completed
-- **Phase 8: Vision, Screen Understanding & Visual Context Engine** — Completed
-- **Phase 9: Advanced Autonomous Task Execution Engine** — Completed
-- **Phase 10: Proactive Personal Assistant & Intelligent Automation** — Completed
-- **Phase 11: Security, Reliability & Production Hardening** — Completed
+### 1. Prerequisites
+- **Operating System**: Windows 10 / Windows 11
+- **Python**: Python 3.10 or higher
 
+### 2. Installation
+```powershell
+# Clone the repository
+git clone https://github.com/VishwaAdarsh/ASTRA-VOICE.git
+cd ASTRA-VOICE
 
----
+# Create and activate virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-## 2. Architecture
+# Install dependencies
+pip install -r requirements.txt
+```
 
-ASTRA decouples reasoning/intent processing from system execution. The system consists of six distinct layers:
+### 3. Running ASTRA
+```powershell
+# Launch PySide6 Desktop GUI Interface
+python main.py
 
-1. **Core Infrastructure (`src/core/`)**: Configuration loading, centralized file logging (`data/logs/astra.log`), exception definitions, and lifecycle startup/shutdown management.
-2. **Brain & Intent Engine (`src/brain/`)**: Domain models (`Command`, `Intent`, `ToolRequest`, `ToolResult`), abstract `IntentRecognizer` interface (implemented by `RuleBasedIntentRecognizer`), and `IntentRouter`.
-3. **Tool System (`src/tools/`)**: Abstract `BaseTool` class, central `ToolRegistry` enforcement, and allowlisted Phase 1 tools.
-4. **Security & Permissions (`src/security/`)**: `PermissionManager` evaluating `SAFE`, `CONFIRM`, and `RESTRICTED` policies, plus user confirmation handlers.
-5. **Execution & Verification (`src/execution/`)**: `ToolExecutor` and `ToolVerifier` providing pre/post execution checks and exception isolation.
-6. **User Interface (`src/interfaces/`)**: Interactive terminal CLI interface.
+# Launch Interactive Terminal CLI Interface
+python main.py --cli
 
----
-
-## 3. Current Capabilities (Phase 1)
-
-ASTRA Phase 1 supports four allowlisted tool categories:
-
-| Tool Name | Example Commands | Actions / Behavior |
-| :--- | :--- | :--- |
-| **Open Application** | `open calculator`, `open notepad`, `open chrome`, `open vscode` | Launches allowlisted Windows desktop applications safely using controlled executable mappings. |
-| **Open Folder** | `open downloads`, `open documents`, `open desktop`, `open pictures` | Opens authorized system folders in Windows File Explorer after path existence verification. |
-| **Open Website** | `open youtube`, `open google`, `open github`, `open https://...` | Opens verified URLs and site shortcuts in the user's default web browser. |
-| **System Information**| `show system information`, `system info`, `specs` | Gathers non-sensitive OS specs, Python runtime version, hostname, and RAM availability using `psutil`. |
-
----
-
-## 4. Project Structure
-
-```text
-ASTRA/
-├── README.md                  # Comprehensive project documentation
-├── architecture.md            # System architectural blueprint
-├── requirements.txt           # Dependency manifest
-├── .env.example               # Environment variables template
-├── .gitignore                 # Git ignore rules
-│
-├── src/
-│   ├── __init__.py
-│   ├── main.py                # Main application entry point
-│   │
-│   ├── core/                  # Configuration, logging, lifecycle & exceptions
-│   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── lifecycle.py
-│   │   ├── exceptions.py
-│   │   └── logger.py
-│   │
-│   ├── brain/                 # Models, Intent Recognition, Routing & Orchestration
-│   │   ├── __init__.py
-│   │   ├── agent.py
-│   │   ├── intent.py
-│   │   ├── router.py
-│   │   └── models.py
-│   │
-│   ├── tools/                 # Base Tool class, Registry & Allowlisted Tools
-│   │   ├── __init__.py
-│   │   ├── registry.py
-│   │   ├── base.py
-│   │   ├── applications.py
-│   │   ├── filesystem.py
-│   │   ├── browser.py
-│   │   └── system.py
-│   │
-│   ├── security/              # Security permissions & confirmation prompts
-│   │   ├── __init__.py
-│   │   ├── permissions.py
-│   │   └── confirmation.py
-│   │
-│   ├── execution/             # Tool executor & pre/post verifiers
-│   │   ├── __init__.py
-│   │   ├── executor.py
-│   │   └── verifier.py
-│   │
-│   └── interfaces/            # User interface (Terminal CLI)
-│       ├── __init__.py
-│       └── cli.py
-│
-├── tests/                     # Automated Pytest suite
-│   ├── __init__.py
-│   ├── test_intent.py
-│   ├── test_router.py
-│   ├── test_tools.py
-│   ├── test_permissions.py
-│   └── test_executor.py
-│
-└── data/
-    └── logs/                  # Development & runtime log storage
-        └── .gitkeep
+# Display Version Metadata
+python main.py --version
 ```
 
 ---
 
-## 5. Installation
+## 🌟 Feature Breakdown (Phases 1 – 12 Completed)
 
-### Prerequisites
-- Operating System: Windows 10 or Windows 11
-- Python: Version 3.10 or higher
-
-### Setup Steps
-1. Clone or navigate to the repository directory:
-   ```cmd
-   cd ASTRA-VOICE
-   ```
-2. Create and activate a Python virtual environment (optional but recommended):
-   ```cmd
-   python -m venv .venv
-   .venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```cmd
-   pip install -r requirements.txt
-   ```
+1. **Voice Intelligence**: Hands-free voice activation, microphone STT, pyttsx3 TTS, and VAD audio pipeline.
+2. **PySide6 Desktop GUI**: Modern dark-themed dashboard with stacked views (Assistant, Activity, Tools, Memory, Vision, Tasks, Automations, Settings).
+3. **LLM Brain Engine**: Multi-provider LLM integration (Mock, OpenAI, Anthropic, Ollama) with rule-based fallback.
+4. **Computer & File Control**: Search, inspect, create, move, copy, rename, delete, organize files, and manage Windows apps.
+5. **Web Intelligence**: Search web sources, fetch webpages, extract text, and compile structured research summaries.
+6. **Memory & Context**: Long-term SQLite knowledge base with automatic expiration policies and privacy deletion tools.
+7. **Vision & Screen Inspector**: Capture screens and active windows, detect visual UI elements, extract OCR text, and interpret error messages.
+8. **Autonomous Task Engine**: High-level goal decomposition into multi-step execution plans, verification checks, and emergency stop.
+9. **Proactive Automation**: Scheduled reminders, condition watches, quiet hours (`23:00 - 07:00`), notifications center, and emergency stop.
+10. **Security & Privacy**: Zero-trust prompt injection defense, secret redaction filter, startup crash recovery, `SECURITY.md`, and `PRIVACY.md`.
 
 ---
 
-## 6. Environment Configuration
-
-Copy `.env.example` to `.env` to configure custom environment settings:
-
-```cmd
-copy .env.example .env
-```
-
-Available options inside `.env`:
-```env
-ASTRA_ENV=development
-LOG_LEVEL=INFO
-LOG_FILE_PATH=data/logs/astra.log
-PERMISSIONS_MODE=NORMAL
-```
+## 🛡️ Security & Privacy
+- **[SECURITY.md](SECURITY.md)**: Details the security hierarchy, permission model, and formal threat matrix (T1 – T15).
+- **[PRIVACY.md](PRIVACY.md)**: Details data retention, local storage policies, zero hidden surveillance guarantees, and user deletion controls.
 
 ---
 
-## 7. Running ASTRA
-
-To start the interactive ASTRA CLI:
-
-```cmd
-python src/main.py
-```
-
-### Example Interactive Session:
-```text
-========================================
-              ASTRA
-      Personal AI Assistant (Phase 1)
-========================================
-
-You > open calculator
-ASTRA > ✓ Calculator opened.
-
-You > open downloads
-ASTRA > ✓ Downloads opened.
-
-You > open youtube
-ASTRA > ✓ Youtube opened.
-
-You > show system information
-ASTRA > ✓ Operating System: Windows 10 (AMD64)
-Python Version: 3.14.6
-Hostname: DESKTOP-MAIN
-RAM: 14.2 GB free of 31.8 GB total
-
-You > do something unsupported
-ASTRA > I don't understand that command yet.
-```
-
----
-
-## 8. Testing
-
-Run the automated test suite with `pytest`:
-
-```cmd
-python -m pytest
-```
-
-All OS-level calls (application launches, folder openings, browser navigation) are mocked during testing to ensure tests run fast and deterministically across environments.
-
----
-
-## 9. Development Roadmap
-
-- [x] **Phase 1: Foundation & Core Engine (Current)**
-  - Modular architecture setup
-  - Domain data models & explicit status enums
-  - Allowlisted tool registry (`open_application`, `open_folder`, `open_website`, `system_information`)
-  - Isolated Rule-Based Intent Recognizer behind abstract interface
-  - Security permission framework & verification layer
-  - Centralized logging & interactive CLI
-  - Comprehensive unit test suite
-- [ ] **Phase 2: Local & Cloud LLM Integration**
-  - Replace/augment `RuleBasedIntentRecognizer` with `LLMIntentRecognizer`
-  - Structured function calling & dynamic parameter extraction
-- [ ] **Phase 3: Voice & Audio Pipeline**
-  - Wake word detection
-  - Offline Speech-To-Text (Whisper / Vosk) & Text-To-Speech (Piper / Edge-TTS)
-- [ ] **Phase 4: Advanced Computer Control & Web Research**
-  - Authorized OS automation, file searching, browser automation
-- [ ] **Phase 5: Persistent Memory & Context Engine**
-  - Local vector database & long-term conversation history
-
----
-
-## 10. Security Principles
-
-1. **No Arbitrary Shell Execution**: ASTRA explicitly forbids generic shell commands like `run_any_command()`.
-2. **Allowlisted Tools Only**: Every executable capability must be defined as a `BaseTool` subclass and registered in `ToolRegistry`.
-3. **Decoupled Brain and OS Execution**: Intent processing never communicates directly with the OS; all calls pass through `ToolExecutor` and `PermissionManager`.
-4. **No Hardcoded Secrets**: Configuration is managed strictly via environment variables (`.env`).
-5. **Zero Secret Logging**: Secrets, credentials, and API keys are filtered out of log outputs (`data/logs/astra.log`).
+## 📄 License
+Released under the MIT License.
