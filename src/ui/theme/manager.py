@@ -36,3 +36,8 @@ class ThemeManager:
         if app:
             stylesheet = generate_stylesheet(self.palette)
             app.setStyleSheet(stylesheet)
+
+    def apply_theme(self, app: QApplication | None = None, theme_name: ThemeMode = "dark") -> None:
+        """Apply theme to target QApplication instance."""
+        self.set_theme(theme_name, app=app)
+

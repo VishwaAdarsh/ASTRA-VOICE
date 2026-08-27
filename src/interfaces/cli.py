@@ -36,11 +36,16 @@ def run_voice_mode(agent, voice_manager: VoiceManager) -> None:
         print(f"ASTRA > {response}\n")
 
 
-def run_cli(start_in_voice_mode: bool = False) -> None:
+def run_cli(agent=None, start_in_voice_mode: bool = False) -> None:
     """Run interactive terminal CLI session for ASTRA."""
-    lifecycle = SystemLifecycle()
-    agent = lifecycle.startup()
-    voice_manager = VoiceManager(agent=agent, config=lifecycle.config)
+    if not agent:
+        lifecycle = SystemLifecycle()
+        agent = lifecycle.startup()
+    else:
+        lifecycle = None
+
+    voice_manager = VoiceManager(agent=agent, config=agent.config)
+
 
     print("\n========================================")
     print("              ASTRA                     ")
@@ -88,9 +93,22 @@ def run_cli(start_in_voice_mode: bool = False) -> None:
             print(f"ASTRA > {response_text}\n")
 
     finally:
-        lifecycle.shutdown()
+        if lifecycle:
+            lifecycle.shutdown(agent)
+
+
+class InteractiveCLI:
+    """Interactive CLI interface container."""
+
+    def __init__(self, agent=None):
+        self.agent = agent
+
+    def start(self, start_in_voice_mode: bool = False) -> None:
+        """Start the interactive CLI session."""
+        run_cli(agent=self.agent, start_in_voice_mode=start_in_voice_mode)
 
 
 if __name__ == "__main__":
     run_cli()
+
 
