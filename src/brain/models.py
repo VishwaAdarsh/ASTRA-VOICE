@@ -29,13 +29,18 @@ class PermissionLevel(str, Enum):
 
 
 class IntentType(str, Enum):
-    """Supported intent classifications for ASTRA Phase 1."""
+    """Supported intent classifications for ASTRA."""
 
     OPEN_APPLICATION = "OPEN_APPLICATION"
     OPEN_FOLDER = "OPEN_FOLDER"
     OPEN_WEBSITE = "OPEN_WEBSITE"
     SYSTEM_INFORMATION = "SYSTEM_INFORMATION"
+    CONVERSATION = "CONVERSATION"
+    WEB_SEARCH = "WEB_SEARCH"
+    MEMORY = "MEMORY"
+    STOP = "STOP"
     UNKNOWN = "UNKNOWN"
+
 
 
 @dataclass(frozen=True)

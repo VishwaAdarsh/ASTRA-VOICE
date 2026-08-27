@@ -3,6 +3,7 @@ Speech-To-Text (STT) Provider Abstraction and Implementations.
 Allows switching STT engines (SpeechRecognition, Whisper, Mock) via provider factory.
 """
 
+import io
 from abc import ABC, abstractmethod
 import speech_recognition as sr
 from src.core.exceptions import AstraError
@@ -38,11 +39,11 @@ class SpeechRecognitionSTTProvider(SpeechToTextProvider):
         if not pcm_data:
             return ""
 
-        wav_bytes = convert_to_wav(pcm_data, sample_rate=sample_rate)
-        audio_file = sr.AudioFile(sr.AudioData(pcm_data, sample_rate, 2))
-
         try:
-            with audio_file as source:
+            wav_bytes = convert_to_wav(pcm_data, sample_rate=sample_rate)
+            wav_stream = io.BytesIO(wav_bytes)
+
+            with sr.AudioFile(wav_stream) as source:
                 audio_data = self.recognizer.record(source)
 
             logger.info("Sending audio to SpeechRecognition engine...")

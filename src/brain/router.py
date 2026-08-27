@@ -19,6 +19,8 @@ class IntentRouter:
         IntentType.OPEN_FOLDER: "open_folder",
         IntentType.OPEN_WEBSITE: "open_website",
         IntentType.SYSTEM_INFORMATION: "system_information",
+        IntentType.WEB_SEARCH: "search_web",
+        IntentType.MEMORY: "remember",
     }
 
     def route(self, intent: Intent) -> ToolRequest:
@@ -29,7 +31,17 @@ class IntentRouter:
                 f"Could not route command '{intent.raw_command}': Unknown intent."
             )
 
-        tool_name = self.INTENT_TOOL_MAP.get(intent.intent_type)
+        if intent.intent_type == IntentType.MEMORY:
+            q = intent.parameters.get("query", "").lower()
+            if "what do you remember" in q or "recall" in q:
+                tool_name = "retrieve_memory"
+            elif "forget" in q:
+                tool_name = "forget_memory"
+            else:
+                tool_name = "remember"
+        else:
+            tool_name = self.INTENT_TOOL_MAP.get(intent.intent_type)
+
         if not tool_name:
             logger.error(f"No tool registered for intent type: {intent.intent_type}")
             raise IntentRecognitionError(

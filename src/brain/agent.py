@@ -261,6 +261,21 @@ class AstraAgent:
         """Deterministic Rule-Based Fallback Engine."""
         logger.info(f"FALLBACK_ENGINE: Processing command '{command.raw_text}'")
         intent = self.fallback_recognizer.recognize(command)
+
+        if intent.intent_type == IntentType.CONVERSATION:
+            resp = "Hello! I am ASTRA, your desktop personal AI assistant. How can I help you today?"
+            result = ToolResult(status=ExecutionStatus.SUCCESS, message=resp)
+            self.context_manager.record_turn_result(resp)
+            return resp, result
+
+        if intent.intent_type == IntentType.STOP:
+            if hasattr(self, "task_manager"):
+                self.task_manager.emergency_stop()
+            resp = "Stopped active operations."
+            result = ToolResult(status=ExecutionStatus.SUCCESS, message=resp)
+            self.context_manager.record_turn_result(resp)
+            return resp, result
+
         if intent.intent_type == IntentType.UNKNOWN:
             result = ToolResult(
                 status=ExecutionStatus.NOT_FOUND,
@@ -274,6 +289,7 @@ class AstraAgent:
         response_text = self._format_response(tool_result)
         self.context_manager.record_turn_result(response_text, tool_request.tool_name, tool_result.data)
         return response_text, tool_result
+
 
     def _format_response(self, result: ToolResult) -> str:
         """Format ToolResult into a clean response string."""
