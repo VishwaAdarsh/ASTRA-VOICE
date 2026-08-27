@@ -79,8 +79,10 @@ class Config:
         }
 
         # Primary ASTRA API Key & Subsystem Credential Integration
-        self.astra_api_key = os.getenv("ASTRA_API_KEY", "93faef10bda772eb4230e8ff1ef37f0e1ca3f3cd")
+        self.astra_api_key = os.getenv("ASTRA_API_KEY", "")
         self.voice_api_key = os.getenv("VOICE_API_KEY", self.astra_api_key)
+
+
 
         # Voice Subsystem Configuration (Phase 2)
         self.voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("true", "1", "yes")
