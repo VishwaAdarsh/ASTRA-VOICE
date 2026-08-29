@@ -40,6 +40,11 @@ class ToolRegistry:
         """Check if a tool name is registered."""
         return name.strip().lower() in self._tools
 
+    def has_tool(self, name: str) -> bool:
+        """Alias for contains(). Check if a tool name is registered."""
+        return self.contains(name)
+
+
     def list_tools(self) -> list[str]:
         """List names of all registered tools."""
         return sorted(list(self._tools.keys()))

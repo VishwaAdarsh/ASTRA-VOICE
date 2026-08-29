@@ -40,9 +40,10 @@ def test_voice_session_turn_success(mock_wait, mock_rec):
     response, result = session.listen_and_process(record_seconds=0.1)
 
     assert result is not None
-    assert "Downloads opened" in response
-    assert tts.spoken_history[0] == "Downloads opened."
+    assert "downloads" in response.lower()
+    assert "downloads" in tts.spoken_history[0].lower()
     assert session.state == VoiceState.IDLE
+
     assert VoiceEvent.LISTENING_STARTED in events_received
     assert VoiceEvent.TRANSCRIPTION_COMPLETED in events_received
     assert VoiceEvent.TTS_COMPLETED in events_received

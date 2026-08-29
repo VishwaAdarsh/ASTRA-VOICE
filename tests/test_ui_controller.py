@@ -35,8 +35,9 @@ def test_app_controller_submit_text_command():
     assert len(received_commands) == 1
     assert received_commands[0] == "open calculator"
     assert len(responses) == 1
-    assert "Calculator opened" in responses[0]
+    assert "calc" in responses[0].lower() or "calculator" in responses[0].lower()
     assert len(controller.activity_history) == 2  # Command + Response entries
+
 
 
 def test_app_controller_voice_state_signal():

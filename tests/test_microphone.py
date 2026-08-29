@@ -48,5 +48,7 @@ def test_microphone_record_chunk_success(mock_wait, mock_rec):
     manager = MicrophoneManager(audio_config=config)
 
     chunk = manager.record_chunk(duration_seconds=1.0)
-    assert isinstance(chunk, bytes)
-    assert len(chunk) == 16000 * 2  # 16-bit = 2 bytes per sample
+    pcm_data = chunk[0] if isinstance(chunk, tuple) else chunk
+    assert isinstance(pcm_data, bytes)
+    assert len(pcm_data) == 16000 * 2  # 16-bit = 2 bytes per sample
+

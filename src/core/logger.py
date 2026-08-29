@@ -16,11 +16,15 @@ class SecretRedactionFilter(logging.Filter):
     """Logging filter to redact API keys, bearer tokens, and secrets from log entries."""
 
     SECRET_PATTERNS = [
-        re.compile(r"(api[_-]?key[\"'\s:=]+)([a-zA-Z0-9_\-]{8,})", re.IGNORECASE),
+        re.compile(r"(api[_-]?key[\"'\s:=]+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
+        re.compile(r"(\bkey[\"'\s:=]+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
+        re.compile(r"(sk[_-][a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
+        re.compile(r"(AQ\.[a-zA-Z0-9_\-]{8,})", re.IGNORECASE),
         re.compile(r"(bearer\s+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
         re.compile(r"(password[\"'\s:=]+)([^\s\"']+)", re.IGNORECASE),
-        re.compile(r"(token[\"'\s:=]+)([a-zA-Z0-9_\-]{8,})", re.IGNORECASE),
+        re.compile(r"(token[\"'\s:=]+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
     ]
+
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.msg, str):
@@ -31,8 +35,12 @@ class SecretRedactionFilter(logging.Filter):
     def redact(cls, text: str) -> str:
         """Redact sensitive credentials in text string."""
         for pattern in cls.SECRET_PATTERNS:
-            text = pattern.sub(r"\1[REDACTED]", text)
+            if pattern.groups == 2:
+                text = pattern.sub(r"\1[REDACTED]", text)
+            else:
+                text = pattern.sub(r"[REDACTED]", text)
         return text
+
 
 
 def setup_logger(log_file: Path | str | None = None, log_level: str = "INFO") -> logging.Logger:

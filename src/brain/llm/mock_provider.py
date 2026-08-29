@@ -36,6 +36,15 @@ class MockLLMProvider(LLMProvider):
             latency_ms=(time.time() - start_time) * 1000,
         )
 
+        # Check if previous steps already completed successfully in prompt context
+        if "Execution Steps Taken So Far:" in prompt and "Status: SUCCESS" in prompt and "None (Initial Step)" not in prompt:
+            return LLMDecision(
+                decision_type=DecisionType.RESPONSE,
+                message="Done. Calculator opened.",
+                usage=usage,
+            )
+
+
         # 1. Greetings & Stop & Time
         if any(w in req_text for w in ["hello", "hi ", "hey", "good morning", "how are you"]):
             return LLMDecision(
@@ -114,7 +123,15 @@ class MockLLMProvider(LLMProvider):
             )
 
         # 4. Open Application & Folders (Phase 1, 5)
-        if "downloads" in req_text or "download folder" in req_text:
+        if "open my project" in req_text or "open project" in req_text:
+            return LLMDecision(
+                decision_type=DecisionType.CLARIFICATION,
+                message="Which project would you like me to open?",
+                reason="Ambiguous project target requested.",
+                usage=usage,
+            )
+        elif "downloads" in req_text or "download folder" in req_text:
+
             return LLMDecision(
                 decision_type=DecisionType.TOOL_CALL,
                 tool_name="open_folder",

@@ -35,7 +35,10 @@ class PathResolver:
         # Check sandbox override for testing
         if self.sandbox_root and self.sandbox_root.exists():
             candidate = self.sandbox_root / target.lstrip("/\\")
+            if not candidate.exists() and cleaned in self.config.folder_allowlist:
+                return self.sandbox_root.resolve()
             return candidate.resolve()
+
 
         # Check known folder allowlist
         if cleaned in self.config.folder_allowlist:

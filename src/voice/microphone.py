@@ -33,12 +33,16 @@ class MicrophoneManager:
             dev_idx = self.config.device_index if self.config.device_index is not None else sd.default.device[0]
             if dev_idx is not None and dev_idx >= 0:
                 dev_info = sd.query_devices(dev_idx)
-                return {
-                    "index": dev_idx,
-                    "name": dev_info.get("name", "Default Microphone"),
-                    "sample_rate": int(dev_info.get("default_samplerate", 44100)),
-                    "channels": int(dev_info.get("max_input_channels", 1)),
-                }
+                if isinstance(dev_info, list) and dev_info:
+                    dev_info = dev_info[0]
+                if isinstance(dev_info, dict):
+                    return {
+                        "index": dev_idx,
+                        "name": dev_info.get("name", "Default Microphone"),
+                        "sample_rate": int(dev_info.get("default_samplerate", 44100)),
+                        "channels": int(dev_info.get("max_input_channels", 1)),
+                    }
+
         except Exception as e:
             logger.warning(f"Could not query default audio device: {e}")
 

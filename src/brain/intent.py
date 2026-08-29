@@ -113,13 +113,18 @@ class RuleBasedIntentRecognizer(IntentRecognizer):
 
         # 8. Check if target is a known application
         if target in self.app_keywords or (match_open and any(app in target for app in self.app_keywords)):
-            app_name = "calc" if ("calc" in target or "calculator" in target) else ("chrome" if "chrome" in target else ("notepad" if "notepad" in target else target))
+            app_name = target
+            for app in sorted(self.app_keywords, key=len, reverse=True):
+                if app in target:
+                    app_name = app
+                    break
             return Intent(
                 intent_type=IntentType.OPEN_APPLICATION,
                 confidence=0.9,
                 parameters={"app_name": app_name},
                 raw_command=command.raw_text,
             )
+
 
         # Fallback to UNKNOWN
         return Intent(

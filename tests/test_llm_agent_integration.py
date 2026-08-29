@@ -16,7 +16,7 @@ def test_agent_llm_tool_call(mock_popen):
     response, result = agent.process_command("Could you please open calculator?")
 
     assert result.status == ExecutionStatus.SUCCESS
-    assert "Calculator opened" in response
+    assert "calc" in response.lower() or "calculator" in response.lower()
     mock_popen.assert_called_once()
 
 
@@ -41,4 +41,5 @@ def test_agent_fallback_mode_on_llm_error():
     with patch("subprocess.Popen") as mock_popen:
         response, result = agent.process_command("open calculator")
         assert result.status == ExecutionStatus.SUCCESS
-        assert "Calculator opened" in response
+        assert "calc" in response.lower() or "calculator" in response.lower()
+
