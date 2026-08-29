@@ -105,7 +105,9 @@ class Config:
         self.llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.2"))
         self.llm_max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "512"))
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))
+        self.llm_retry_count = int(os.getenv("LLM_RETRY_COUNT", "2"))
         self.llm_fallback_enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() in ("true", "1", "yes")
+
 
 
         # Filesystem Controls (Phase 5)
