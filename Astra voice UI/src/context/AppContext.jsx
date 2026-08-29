@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { voiceService, parseVoiceIntent } from '../services/voiceService';
+import { voiceService } from '../services/voiceService';
 import { astraApi } from '../services/api';
 import confetti from 'canvas-confetti';
+
 
 const AppContext = createContext(null);
 
@@ -165,22 +166,20 @@ export const AppProvider = ({ children }) => {
 
     try {
       if (isBackendConnected) {
-        // Send command to Python AstraAgent
+        // Send command to Python AstraAgent (Single Source of Truth)
         await astraApi.sendCommand(queryText);
       } else {
-        // Fallback local intent parser if backend is offline
-        setTimeout(() => {
-          const intent = parseVoiceIntent(queryText);
-          const astraMsg = {
-            id: 'msg-' + (Date.now() + 1),
-            sender: 'astra',
-            text: intent.response,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          setMessages((prev) => [...prev, astraMsg]);
-          setAssistantState('idle');
-        }, 600);
+        // Honest offline notification - no fake local assistant brain
+        const astraMsg = {
+          id: 'msg-' + (Date.now() + 1),
+          sender: 'astra',
+          text: 'ASTRA Engine is currently offline. Please ensure the Python backend server is running.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, astraMsg]);
+        setAssistantState('idle');
       }
+
     } catch (err) {
       console.error('[AppContext] Error sending command:', err);
       setAssistantState('idle');
