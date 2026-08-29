@@ -5,6 +5,7 @@ Enforces explicit provider resolution without silent fallbacks.
 """
 
 from typing import Type
+from src.brain.llm.gemini_provider import GeminiProvider
 from src.brain.llm.mock_provider import MockLLMProvider
 from src.brain.llm.models import ModelConfig
 from src.brain.llm.provider import LLMProvider
@@ -17,11 +18,15 @@ logger = get_logger()
 class LLMProviderFactory:
     """Factory for instantiating LLM providers explicitly."""
 
-    _registry: dict[str, Type[LLMProvider]] = {}
+    _registry: dict[str, Type[LLMProvider]] = {
+        "gemini": GeminiProvider,
+        "google_gemini": GeminiProvider,
+        "google-gemini": GeminiProvider,
+    }
 
     @classmethod
     def register(cls, provider_name: str, provider_cls: Type[LLMProvider]) -> None:
-        """Register an LLM provider implementation class (Registration Point for Phase 14+)."""
+        """Register an LLM provider implementation class."""
         key = provider_name.strip().lower()
         cls._registry[key] = provider_cls
         logger.info(f"Registered LLM provider '{key}' -> {provider_cls.__name__}")
@@ -35,14 +40,9 @@ class LLMProviderFactory:
         if provider_name in ("mock", "test", "default"):
             return MockLLMProvider(config=config)
 
-        # Registration Point for Phase 14 Gemini Provider
+        # Real Gemini Provider Resolution (Phase 14)
         if provider_name in ("gemini", "google_gemini", "google-gemini"):
-            if "gemini" in cls._registry:
-                return cls._registry["gemini"](config=config)
-            raise LLMProviderError(
-                f"LLM Provider '{config.provider}' is reserved for Phase 14 and is not implemented yet. "
-                "Set LLM_PROVIDER=mock for development/testing."
-            )
+            return GeminiProvider(config=config)
 
         # Dynamically Registered Provider Check
         if provider_name in cls._registry:
@@ -51,5 +51,5 @@ class LLMProviderFactory:
         # Explicit Error: No silent fallback permitted
         raise LLMProviderError(
             f"Unsupported or unregistered LLM Provider '{config.provider}'. "
-            "No silent fallback permitted. Available providers: 'mock'."
+            "No silent fallback permitted. Available providers: 'mock', 'gemini'."
         )

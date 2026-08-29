@@ -11,5 +11,9 @@ numpy>=1.24.0
 # Desktop Interface Dependencies (Phase 3)
 PySide6>=6.5.0
 
+# LLM Subsystem Dependencies (Phase 14)
+google-genai>=2.0.0
+
 # Development & Testing
 pytest>=8.0.0
+
