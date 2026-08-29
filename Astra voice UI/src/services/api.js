@@ -1,10 +1,27 @@
 /**
  * ASTRA API & WebSocket Communication Client.
  * Connects the React Stitch UI to the Python ASTRA Engine backend.
+ * Dynamically resolves backend host and port from window.location for zero desync.
  */
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
-const WS_URL = 'ws://127.0.0.1:8000/api/v1/ws';
+function getBackendEndpoints() {
+  if (typeof window !== 'undefined' && window.location && window.location.host) {
+    const isDevPort = window.location.port === '5173' || window.location.port === '3000';
+    const host = isDevPort ? '127.0.0.1:8000' : window.location.host;
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const httpProto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+    return {
+      apiBaseUrl: `${httpProto}//${host}/api/v1`,
+      wsUrl: `${wsProto}//${host}/api/v1/ws`,
+      host: host,
+    };
+  }
+  return {
+    apiBaseUrl: 'http://127.0.0.1:8000/api/v1',
+    wsUrl: 'ws://127.0.0.1:8000/api/v1/ws',
+    host: '127.0.0.1:8000',
+  };
+}
 
 class AstraApiClient {
   constructor() {
@@ -12,14 +29,26 @@ class AstraApiClient {
     this.eventListeners = new Map();
     this.isConnected = false;
     this.reconnectTimer = null;
+    this.endpoints = getBackendEndpoints();
+  }
+
+  getApiBaseUrl() {
+    this.endpoints = getBackendEndpoints();
+    return this.endpoints.apiBaseUrl;
+  }
+
+  getWsUrl() {
+    this.endpoints = getBackendEndpoints();
+    return this.endpoints.wsUrl;
   }
 
   initWebSocket() {
     try {
-      this.ws = new WebSocket(WS_URL);
+      const wsUrl = this.getWsUrl();
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('[ASTRA Client] Connected to Python Engine WebSocket');
+        console.log(`[ASTRA Client] Connected to Python Engine WebSocket (${wsUrl})`);
         this.isConnected = true;
         this.emit('connection_changed', { connected: true });
         if (this.reconnectTimer) {
@@ -86,8 +115,9 @@ class AstraApiClient {
 
   // REST Helpers
   async request(endpoint, options = {}) {
+    const baseUrl = this.getApiBaseUrl();
     try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const res = await fetch(`${baseUrl}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,

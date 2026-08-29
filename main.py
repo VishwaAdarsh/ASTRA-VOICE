@@ -52,12 +52,12 @@ def find_available_port(preferred_port: int = 8000, host: str = "127.0.0.1") -> 
     return preferred_port
 
 
-def start_server_thread(agent, voice_manager, port: int = 8000):
+def start_server_thread(agent, voice_manager, port: int = 8000, host: str = "127.0.0.1"):
     """Run uvicorn FastAPI server in background thread."""
     from src.api.server import create_app
 
     app = create_app(agent=agent, voice_manager=voice_manager)
-    config = uvicorn.Config(app=app, host="127.0.0.1", port=port, log_level="warning")
+    config = uvicorn.Config(app=app, host=host, port=port, log_level="warning")
     server = uvicorn.Server(config)
     server_thread = threading.Thread(target=server.run, daemon=True)
     server_thread.start()
@@ -76,22 +76,27 @@ def main():
     if args.debug:
         config.log_level = "DEBUG"
 
+    host = "127.0.0.1"
+    bound_port = find_available_port(preferred_port=args.port, host=host)
+
+    print("[ASTRA] Backend starting...")
+    print(f"[ASTRA] Host: {host}")
+    print(f"[ASTRA] Port: {bound_port}")
+    print(f"[ASTRA] REST: http://{host}:{bound_port}/api/v1")
+    print(f"[ASTRA] WebSocket: ws://{host}:{bound_port}/api/v1/ws")
+
     lifecycle = SystemLifecycle(config=config)
     agent = lifecycle.startup()
     voice_mgr = VoiceManager(agent=agent)
 
-    # Check and select available port cleanly
-    bound_port = find_available_port(preferred_port=args.port)
-    if bound_port != args.port:
-        print(f"[ASTRA] Requested port {args.port} is occupied. Using available port {bound_port}.")
-
     # Start FastAPI + WebSocket communication server
-    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=bound_port)
-    time.sleep(0.5)  # Give server short moment to bind port
+    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=bound_port, host=host)
+    time.sleep(0.4)  # Allow uvicorn socket binding
 
     # Register OS signal handlers for graceful shutdown
     def _sig_handler(sig, frame):
-        print("\nShutdown signal received. Exiting ASTRA...")
+        print("\n[ASTRA] Shutdown signal received. Stopping server and engines...")
+        server.should_exit = True
         lifecycle.shutdown(agent)
         sys.exit(0)
 
@@ -99,11 +104,14 @@ def main():
     signal.signal(signal.SIGTERM, _sig_handler)
 
     if args.backend:
-        print(f"ASTRA Backend Engine & API Server running on http://127.0.0.1:{bound_port}")
-        print("Press Ctrl+C to stop.")
+        print(f"[ASTRA] Running in backend server mode. Press Ctrl+C to stop.")
         try:
-            server_thread.join()
+            while server_thread.is_alive():
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            _sig_handler(None, None)
         finally:
+            server.should_exit = True
             lifecycle.shutdown(agent)
 
     elif args.cli:
@@ -112,6 +120,7 @@ def main():
         try:
             cli.start()
         finally:
+            server.should_exit = True
             lifecycle.shutdown(agent)
 
     else:
@@ -123,12 +132,13 @@ def main():
             app = QApplication.instance() or QApplication(sys.argv)
             app.setApplicationName("ASTRA Personal AI Assistant")
 
-            window = AstraWebWindow(server_url=f"http://127.0.0.1:{bound_port}")
+            window = AstraWebWindow(server_url=f"http://{host}:{bound_port}")
             window.show()
 
             try:
                 sys.exit(app.exec())
             finally:
+                server.should_exit = True
                 lifecycle.shutdown(agent)
 
         except Exception as e:
@@ -138,6 +148,7 @@ def main():
             try:
                 cli.start()
             finally:
+                server.should_exit = True
                 lifecycle.shutdown(agent)
 
 
