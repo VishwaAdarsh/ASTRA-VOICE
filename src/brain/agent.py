@@ -3,10 +3,14 @@ ASTRA Agent Orchestrator (Phase 4 Upgraded).
 Coordinates LLM Reasoning, Context Management, Task Planning, Permission Enforcement, Tool Execution, and Deterministic Fallback.
 """
 
+import time
+from typing import Any
+
 from src.brain.context.manager import ContextManager
 from src.brain.intent import IntentRecognizer, RuleBasedIntentRecognizer
 from src.brain.llm.client import LLMClient
 from src.brain.llm.models import DecisionType, LLMDecision, ModelConfig
+
 from src.brain.llm.provider import LLMProvider
 from src.brain.models import Command, ExecutionStatus, IntentType, ToolRequest, ToolResult
 from src.brain.planning.planner import TaskPlanner
@@ -184,80 +188,171 @@ class AstraAgent:
 
 
     def process_command(self, raw_input: str) -> tuple[str, ToolResult]:
-        """Process a user command through the LLM Reasoning Engine with Fallback Engine."""
-        logger.info(f"COMMAND_RECEIVED: '{raw_input}'")
+        """Process a user command through the Controlled Multi-Step Agent Orchestration Loop."""
+        logger.info(f"AGENT_REQUEST_STARTED: '{raw_input}'")
 
         command = Command(
             raw_text=raw_input,
             normalized_text=raw_input.strip().lower(),
         )
 
-        # Add message to Context Manager
+        # Add user message to Context Manager
         self.context_manager.add_user_message(raw_input)
 
+        max_iterations = getattr(self.config, "agent_max_iterations", 5)
+        timeout_sec = getattr(self.config, "agent_timeout", 30.0)
+        start_time = time.time()
+
+        tool_schemas = generate_tool_schemas(self.registry)
+        tool_history: list[dict[str, Any]] = []
+        seen_tool_signatures: list[str] = []
+        last_tool_result: ToolResult | None = None
+
         try:
-            # 1. Attempt LLM Reasoning Engine
-            tool_schemas = generate_tool_schemas(self.registry)
-            formatted_context = self.context_manager.get_formatted_context_prompt()
-            full_prompt = f"Context History:\n{formatted_context}\n\nCurrent Request:\n{raw_input}"
+            iteration = 0
+            while iteration < max_iterations:
+                # Check overall agent request timeout
+                elapsed = time.time() - start_time
+                if elapsed > timeout_sec:
+                    logger.warning(f"AGENT_TIMEOUT: Request exceeded {timeout_sec}s threshold.")
+                    timeout_res = ToolResult(
+                        status=ExecutionStatus.FAILED,
+                        message="Request exceeded execution timeout limit.",
+                        error="Execution timeout",
+                    )
+                    return "I couldn't complete the task within the allowed time limit.", timeout_res
 
-            decision = self.llm_client.generate_decision(
-                prompt=full_prompt,
-                system_prompt=ASTRA_SYSTEM_PROMPT_V1,
-                tool_schemas=tool_schemas,
-            )
+                iteration += 1
+                logger.info(f"AGENT_ITERATION: {iteration}/{max_iterations}")
 
-            # 2. Process LLM Decision
-            if decision.decision_type == DecisionType.TOOL_CALL and decision.tool_name:
-                logger.info(f"LLM_TOOL_CALL: tool='{decision.tool_name}', args={decision.arguments}")
-                tool_request = ToolRequest(
-                    tool_name=decision.tool_name,
-                    parameters=decision.arguments,
+                # Build context-aware prompt with prior step results
+                formatted_context = self.context_manager.get_formatted_context_prompt()
+
+                steps_summary_lines = []
+                for idx, step_info in enumerate(tool_history):
+                    steps_summary_lines.append(
+                        f"Step {idx+1}: Tool '{step_info['tool']}' (args={step_info['args']}) -> "
+                        f"Status: {step_info['status']}, Result: {step_info['message']}, Data: {step_info['data']}"
+                    )
+                steps_context = "\n".join(steps_summary_lines) if steps_summary_lines else "None (Initial Step)"
+
+                full_prompt = (
+                    f"Context History:\n{formatted_context}\n\n"
+                    f"User Command:\n{raw_input}\n\n"
+                    f"Execution Steps Taken So Far:\n{steps_context}\n\n"
+                    f"Instructions: If the user request has been fully satisfied, return a natural conversational response. "
+                    f"If another action is required to fulfill the request, select the next appropriate tool."
                 )
-                tool_result = self.executor.execute(tool_request)
-                response_text = self._format_response(tool_result)
-                self.context_manager.record_turn_result(response_text, decision.tool_name, tool_result.data)
-                return response_text, tool_result
 
-            elif decision.decision_type == DecisionType.RESPONSE:
-                response_text = decision.message or "Command processed."
-                tool_result = ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
-                self.context_manager.record_turn_result(response_text)
-                return response_text, tool_result
+                decision = self.llm_client.generate_decision(
+                    prompt=full_prompt,
+                    system_prompt=ASTRA_SYSTEM_PROMPT_V1,
+                    tool_schemas=tool_schemas,
+                )
 
-            elif decision.decision_type == DecisionType.CLARIFICATION:
-                response_text = decision.message or "Could you please clarify your request?"
-                tool_result = ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
-                self.context_manager.record_turn_result(response_text)
-                return response_text, tool_result
+                # Case 1: Final Conversational Response (Task Completed)
+                if decision.decision_type == DecisionType.RESPONSE:
+                    response_text = decision.message or "Task completed."
+                    final_result = last_tool_result or ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
+                    self.context_manager.record_turn_result(response_text)
+                    logger.info(f"AGENT_COMPLETED: Final response generated in iteration {iteration}")
+                    return response_text, final_result
 
-            elif decision.decision_type == DecisionType.PLAN and decision.steps:
-                logger.info("LLM_PLAN: Executing multi-step plan")
-                plan = self.planner.create_plan_from_decision(decision, raw_input)
-                is_valid, err = self.plan_validator.validate(plan)
-                if not is_valid:
-                    logger.warning(f"Plan validation failed: {err}")
+                # Case 2: Clarification Request
+                elif decision.decision_type == DecisionType.CLARIFICATION:
+                    response_text = decision.message or "Could you please clarify your request?"
+                    final_result = ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
+                    self.context_manager.record_turn_result(response_text)
+                    return response_text, final_result
+
+                # Case 3: Structured Tool Call
+                elif decision.decision_type == DecisionType.TOOL_CALL and decision.tool_name:
+                    tool_name = decision.tool_name
+                    arguments = decision.arguments or {}
+                    logger.info(f"AGENT_TOOL_REQUEST: tool='{tool_name}', args={arguments}")
+
+                    # Repetitive loop detection
+                    call_sig = f"{tool_name}:{sorted(arguments.items())}"
+                    if seen_tool_signatures.count(call_sig) >= 2:
+                        logger.warning(f"LOOP_DETECTED: Tool '{call_sig}' repeated 2+ times. Halting loop.")
+                        loop_res = ToolResult(
+                            status=ExecutionStatus.FAILED,
+                            message="Repetitive tool execution loop detected.",
+                            error="Loop limit exceeded",
+                        )
+                        return f"I stopped because the action '{tool_name}' was repeating without progress.", loop_res
+
+                    seen_tool_signatures.append(call_sig)
+
+                    # Execute tool through authoritative security and verification pipeline
+                    tool_request = ToolRequest(
+                        tool_name=tool_name,
+                        parameters=arguments,
+                    )
+                    tool_result = self.executor.execute(tool_request)
+                    last_tool_result = tool_result
+
+                    # Record step in local iteration history
+                    tool_history.append({
+                        "tool": tool_name,
+                        "args": arguments,
+                        "status": tool_result.status.value,
+                        "message": tool_result.message,
+                        "data": tool_result.data or {},
+                        "verified": getattr(tool_result, "verified", True),
+                    })
+
+                    self.context_manager.record_turn_result(
+                        self._format_response(tool_result),
+                        tool_name,
+                        tool_result.data,
+                    )
+
+                    # Single-step completion optimization for simple non-compound open/launch commands
+                    is_simple_open = raw_input.lower().startswith(("open ", "launch ", "start "))
+                    has_compound_intent = any(kw in raw_input.lower() for kw in (" and ", " then ", " after ", "find", "search", "look"))
+                    if len(tool_history) == 1 and is_simple_open and not has_compound_intent:
+                        response_text = self._format_response(tool_result)
+                        return response_text, tool_result
+
+
+                elif decision.decision_type == DecisionType.PLAN and decision.steps:
+                    # Multi-step plan execution
+                    logger.info("LLM_PLAN: Executing multi-step plan")
+                    plan = self.planner.create_plan_from_decision(decision, raw_input)
+                    is_valid, err = self.plan_validator.validate(plan)
+                    if not is_valid:
+                        logger.warning(f"Plan validation failed: {err}")
+                        return self._fallback_execution(command)
+
+                    last_result = None
+                    for step in plan.steps:
+                        req = ToolRequest(tool_name=step.tool_name, parameters=step.arguments)
+                        last_result = self.executor.execute(req)
+                        if last_result.status != ExecutionStatus.SUCCESS:
+                            break
+
+                    response_text = self._format_response(last_result) if last_result else "Plan completed."
+                    return response_text, last_result or ToolResult(status=ExecutionStatus.SUCCESS, message="Plan executed.")
+
+                else:
+                    logger.info("LLM returned fallback/error decision. Invoking fallback engine.")
                     return self._fallback_execution(command)
 
-                # Execute valid plan steps
-                last_result = None
-                for step in plan.steps:
-                    req = ToolRequest(tool_name=step.tool_name, parameters=step.arguments)
-                    last_result = self.executor.execute(req)
-                    if last_result.status != ExecutionStatus.SUCCESS:
-                        break
+            # Reached max iterations limit
+            logger.warning(f"AGENT_MAX_ITERATIONS_REACHED: {max_iterations}")
+            max_iter_res = ToolResult(
+                status=ExecutionStatus.FAILED,
+                message="I reached the maximum number of steps allowed for this task.",
+                error="Max iterations limit reached",
+            )
+            return "I reached the maximum number of steps allowed for this task.", max_iter_res
 
-                response_text = self._format_response(last_result) if last_result else "Plan completed."
-                return response_text, last_result or ToolResult(status=ExecutionStatus.SUCCESS, message="Plan executed.")
-
-            else:
-                # LLM returned error or fallback mode required
-                logger.info("LLM returned fallback/error decision. Invoking deterministic fallback engine.")
-                return self._fallback_execution(command)
 
         except Exception as e:
-            logger.error(f"Error during LLM reasoning processing: {e}. Switching to fallback engine.", exc_info=True)
+            logger.error(f"Error during agent orchestration: {e}. Switching to fallback engine.", exc_info=True)
             return self._fallback_execution(command)
+
 
     def _fallback_execution(self, command: Command) -> tuple[str, ToolResult]:
         """Deterministic Rule-Based Fallback Engine."""
