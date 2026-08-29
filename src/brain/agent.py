@@ -294,10 +294,10 @@ class AstraAgent:
 
 
     def _format_response(self, result: ToolResult) -> str:
-        """Format ToolResult into a clean, natural assistant response string."""
-        if result.status == ExecutionStatus.SUCCESS:
+        """Format ToolResult into a clean, truthful assistant response string."""
+        if result.status == ExecutionStatus.SUCCESS and getattr(result, "verified", True):
             msg = result.message.strip()
-            if msg.lower() == "downloads opened.":
+            if msg.lower() in ("downloads opened.", "opened downloads folder."):
                 return "Done. I've opened your Downloads folder."
             elif not msg.startswith("✓") and not msg.startswith("Done"):
                 return f"Done. {msg}"
@@ -305,7 +305,9 @@ class AstraAgent:
         elif result.status == ExecutionStatus.DENIED:
             return f"Security authorization required: {result.message}"
         else:
-            return f"I couldn't complete that action: {result.message}"
+            reason = result.error or result.message or "Execution or verification failed."
+            return f"I couldn't complete that action: {reason}"
+
 
 
     def shutdown(self) -> None:

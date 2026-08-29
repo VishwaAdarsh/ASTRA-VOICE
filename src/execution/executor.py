@@ -107,5 +107,8 @@ class ToolExecutor:
             )
 
         # 7. Post-execution Verification
-        verified_result = self.verifier.verify_post_execution(result)
+        verified_result = self.verifier.verify_post_execution(
+            result, tool_name=tool.name, parameters=request.parameters
+        )
         return verified_result
+

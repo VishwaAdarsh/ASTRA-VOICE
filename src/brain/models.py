@@ -80,3 +80,5 @@ class ToolResult:
     data: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     execution_time_ms: float = 0.0
+    verified: bool = False
+
