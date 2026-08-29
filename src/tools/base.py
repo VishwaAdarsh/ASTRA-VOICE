@@ -14,6 +14,12 @@ class BaseTool(ABC):
     name: str
     description: str
     permission_level: PermissionLevel = PermissionLevel.SAFE
+    expose_to_llm: bool = True
+    parameters_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {},
+        "required": [],
+    }
 
     @abstractmethod
     def validate(self, parameters: dict[str, Any]) -> bool:
@@ -24,3 +30,16 @@ class BaseTool(ABC):
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         """Execute tool logic and return structured ToolResult."""
         pass
+
+    def get_schema(self) -> dict[str, Any]:
+        """Return standardized JSON schema describing tool metadata and parameters."""
+        schema_params = getattr(
+            self,
+            "parameters_schema",
+            {"type": "object", "properties": {}, "required": []},
+        )
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": schema_params,
+        }

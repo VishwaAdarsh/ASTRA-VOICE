@@ -1,6 +1,7 @@
 """
-Google Gemini Real LLM Provider Integration (Phase 14).
+Google Gemini Real LLM Provider Integration (Phase 14 & 15).
 Communicates with Google Gemini API using the official google-genai SDK.
+Supports structured tool schema conversion and Gemini function-calling representations.
 """
 
 import os
@@ -19,11 +20,11 @@ logger = get_logger()
 
 
 class GeminiProvider(LLMProvider):
-    """Real Google Gemini LLM Provider implementation."""
+    """Real Google Gemini LLM Provider implementation with Function Calling support."""
 
     def __init__(self, config: ModelConfig | None = None):
         super().__init__(config=config)
-        
+
         # Authenticate using configuration or environment variables securely
         self.api_key = (
             self.config.api_key
@@ -50,10 +51,45 @@ class GeminiProvider(LLMProvider):
             logger.error(f"Failed to initialize Gemini Client: {e}")
             raise LLMProviderError(f"Failed to initialize Gemini API client: {e}")
 
+    def _convert_tool_schemas(
+        self, tool_schemas: list[dict[str, Any]] | None
+    ) -> list[types.Tool] | None:
+        """Convert ASTRA tool schemas to Gemini API Tool FunctionDeclarations."""
+        if not tool_schemas:
+            return None
+
+        function_declarations: list[types.FunctionDeclaration] = []
+        for schema in tool_schemas:
+            try:
+                name = schema.get("name", "")
+                description = schema.get("description", "")
+                if not name or not description:
+                    continue
+
+                parameters = schema.get(
+                    "parameters",
+                    {"type": "object", "properties": {}, "required": []},
+                )
+
+                func_decl = types.FunctionDeclaration(
+                    name=name,
+                    description=description,
+                    parameters=parameters,
+                )
+                function_declarations.append(func_decl)
+            except Exception as e:
+                logger.warning(f"Failed to convert schema for tool '{schema.get('name')}': {e}")
+                continue
+
+        if not function_declarations:
+            return None
+
+        return [types.Tool(function_declarations=function_declarations)]
+
     def generate(self, prompt: str, system_prompt: str | None = None) -> str:
         """Generate text completion from Google Gemini API."""
         start_time = time.time()
-        logger.info(f"[LLM] Gemini request started (model='{self.model_name}')")
+        logger.info(f"[LLM] Gemini text request started (model='{self.model_name}')")
 
         try:
             gen_config = types.GenerateContentConfig(
@@ -86,24 +122,64 @@ class GeminiProvider(LLMProvider):
         system_prompt: str | None = None,
         tool_schemas: list[dict[str, Any]] | None = None,
     ) -> LLMDecision:
-        """Generate conversational decision from Gemini API (Phase 14: Text Response Only)."""
+        """Generate decision from Gemini API with structured function calling support (Phase 15)."""
         start_time = time.time()
-        raw_text = self.generate(prompt=prompt, system_prompt=system_prompt)
-        latency_ms = (time.time() - start_time) * 1000
+        logger.info(f"[LLM] Gemini structured request started (model='{self.model_name}', tools={len(tool_schemas or [])})")
 
-        # Estimate usage token metrics safely
-        prompt_tokens = max(1, len(prompt) // 4)
-        completion_tokens = max(1, len(raw_text) // 4)
-        usage = LLMUsage(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            latency_ms=latency_ms,
-        )
+        try:
+            gemini_tools = self._convert_tool_schemas(tool_schemas)
+            gen_config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=self.config.temperature,
+                max_output_tokens=self.config.max_output_tokens,
+                tools=gemini_tools,
+            )
 
-        return LLMDecision(
-            decision_type=DecisionType.RESPONSE,
-            message=raw_text,
-            raw_response=raw_text,
-            usage=usage,
-        )
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=gen_config,
+            )
+
+            latency_ms = (time.time() - start_time) * 1000
+            prompt_tokens = max(1, len(prompt) // 4)
+            usage = LLMUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=10,
+                total_tokens=prompt_tokens + 10,
+                latency_ms=latency_ms,
+            )
+
+            # Check for Gemini Function Call
+            if response.function_calls:
+                fc = response.function_calls[0]
+                tool_name = fc.name
+                arguments = dict(fc.args or {})
+                logger.info(f"[LLM] Gemini selected tool: '{tool_name}' with args: {arguments}")
+
+                return LLMDecision(
+                    decision_type=DecisionType.TOOL_CALL,
+                    tool_name=tool_name,
+                    arguments=arguments,
+                    raw_response=str(response.text or ""),
+                    usage=usage,
+                )
+
+            # Normal conversational text response
+            result_text = (response.text or "").strip()
+            usage.completion_tokens = max(1, len(result_text) // 4)
+            usage.total_tokens = prompt_tokens + usage.completion_tokens
+
+            return LLMDecision(
+                decision_type=DecisionType.RESPONSE,
+                message=result_text,
+                raw_response=result_text,
+                usage=usage,
+            )
+
+        except APIError as ae:
+            logger.error(f"[LLM] Gemini API error: {ae}")
+            raise LLMProviderError(f"Gemini API call failed: {ae}")
+        except Exception as e:
+            logger.error(f"[LLM] Gemini structured request failed: {e}")
+            raise LLMProviderError(f"Gemini request failed: {e}")

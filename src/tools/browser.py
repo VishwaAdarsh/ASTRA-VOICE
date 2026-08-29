@@ -21,6 +21,18 @@ class OpenWebsiteTool(BaseTool):
     description = "Opens websites (YouTube, Google, GitHub, URLs) in default web browser."
     permission_level = PermissionLevel.SAFE
 
+    parameters_schema = {
+        "type": "object",
+        "properties": {
+            "target": {
+                "type": "string",
+                "description": "Website shortcut (e.g. 'youtube', 'google', 'github', 'reddit') or complete web URL to open",
+            }
+        },
+        "required": ["target"],
+    }
+
+
     def __init__(self, config: Config | None = None):
         self.config = config or Config()
 

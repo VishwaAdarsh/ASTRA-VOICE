@@ -35,6 +35,17 @@ class OpenFileTool(BaseTool):
     def permission_level(self) -> PermissionLevel:
         return PermissionLevel.SAFE
 
+    parameters_schema = {
+        "type": "object",
+        "properties": {
+            "target": {
+                "type": "string",
+                "description": "Path or filename of target file to open with default application",
+            }
+        },
+        "required": ["target"],
+    }
+
     def validate(self, parameters: dict[str, Any]) -> bool:
         return "target" in parameters and isinstance(parameters["target"], str)
 
@@ -75,6 +86,17 @@ class OpenFolderTool(BaseTool):
     description = "Opens a safe allowlisted folder in Windows File Explorer."
     permission_level = PermissionLevel.SAFE
 
+    parameters_schema = {
+        "type": "object",
+        "properties": {
+            "folder_name": {
+                "type": "string",
+                "description": "Folder name (e.g. 'downloads', 'documents', 'desktop', 'pictures', 'videos', 'music', 'home') or directory path to open",
+            }
+        },
+        "required": ["folder_name"],
+    }
+
     def __init__(self, config: Config | None = None, path_resolver: PathResolver | None = None):
         self.config = config or Config()
         self.resolver = path_resolver or PathResolver(config=self.config)
@@ -84,6 +106,7 @@ class OpenFolderTool(BaseTool):
         if not folder_name or not isinstance(folder_name, str):
             return False
         return self.config.get_folder_path(folder_name) is not None or self.config.is_app_allowed(folder_name)
+
 
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:

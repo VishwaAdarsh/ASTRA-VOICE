@@ -22,6 +22,18 @@ class OpenApplicationTool(BaseTool):
     description = "Launches an allowlisted Windows application."
     permission_level = PermissionLevel.SAFE
 
+    parameters_schema = {
+        "type": "object",
+        "properties": {
+            "app_name": {
+                "type": "string",
+                "description": "Name of application to launch (e.g. 'calculator', 'notepad', 'chrome', 'vscode', 'explorer', 'paint', 'cmd')",
+            }
+        },
+        "required": ["app_name"],
+    }
+
+
     def __init__(self, config: Config | None = None, app_registry: ApplicationRegistry | None = None):
         self.config = config or Config()
         self.app_registry = app_registry or ApplicationRegistry(config=self.config)

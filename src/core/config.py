@@ -81,6 +81,8 @@ class Config:
         # Primary ASTRA API Key & Subsystem Credential Integration
         self.astra_api_key = os.getenv("ASTRA_API_KEY", "")
         self.voice_api_key = os.getenv("VOICE_API_KEY", self.astra_api_key)
+        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY", self.voice_api_key)
+
 
 
 
