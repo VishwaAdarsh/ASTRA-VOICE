@@ -50,10 +50,29 @@ class Pyttsx3TTSProvider(TextToSpeechProvider):
         self.volume = volume
         self._is_speaking_flag = False
         self._lock = threading.Lock()
+        self._engine = None
+
+    def _get_engine(self):
+        """Lazily initialize or return cached SAPI5 pyttsx3 engine."""
+        if self._engine is None:
+            try:
+                self._engine = pyttsx3.init()
+                self._engine.setProperty("rate", self.rate)
+                self._engine.setProperty("volume", self.volume)
+            except Exception as e:
+                logger.warning(f"Failed to initialize pyttsx3 SAPI5 engine: {e}")
+                self._engine = None
+        return self._engine
 
     def configure(self, rate: int = 175, volume: float = 1.0, voice_id: str | None = None) -> None:
         self.rate = rate
         self.volume = volume
+        if self._engine:
+            try:
+                self._engine.setProperty("rate", self.rate)
+                self._engine.setProperty("volume", self.volume)
+            except Exception:
+                pass
 
     def is_speaking(self) -> bool:
         return self._is_speaking_flag
@@ -62,6 +81,11 @@ class Pyttsx3TTSProvider(TextToSpeechProvider):
         """Interrupt and stop active speech playback."""
         logger.info("TTS Interruption requested. Stopping speech playback...")
         self._is_speaking_flag = False
+        if self._engine:
+            try:
+                self._engine.stop()
+            except Exception:
+                pass
 
     def speak(self, text: str) -> None:
         if not text or not text.strip():
@@ -72,19 +96,20 @@ class Pyttsx3TTSProvider(TextToSpeechProvider):
             logger.info(f"TTS SPEAKING: '{text}'")
 
             try:
-                # Initialize local pyttsx3 engine instance per call for thread safety
-                engine = pyttsx3.init()
-                engine.setProperty("rate", self.rate)
-                engine.setProperty("volume", self.volume)
+                engine = self._get_engine()
+                if engine is None:
+                    engine = pyttsx3.init()
+                    engine.setProperty("rate", self.rate)
+                    engine.setProperty("volume", self.volume)
 
                 engine.say(text)
                 engine.runAndWait()
-                engine.stop()
             except Exception as e:
                 logger.error(f"Pyttsx3 TTS synthesis error: {e}")
-                # Failure to synthesize spoken output should not crash application
+                self._engine = None  # Reset engine on error to allow clean re-initialization
             finally:
                 self._is_speaking_flag = False
+
 
 
 class MockTTSProvider(TextToSpeechProvider):

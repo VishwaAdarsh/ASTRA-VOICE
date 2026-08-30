@@ -65,12 +65,14 @@ class VoiceSession:
                 logger.error(f"Error emitting event {event}: {e}")
 
     def listen_and_process(self, record_seconds: float = 3.0) -> tuple[str, ToolResult | None]:
-        """Perform a single voice turn: Listen -> STT -> ASTRA Core -> Response -> TTS."""
+        """Perform a single voice turn: Listen -> STT -> ASTRA Core -> Response -> TTS with timing instrumentation."""
+        t_start = time.time()
         try:
             # 1. State: LISTENING
             self._set_state(VoiceState.LISTENING)
             self.emit_event(VoiceEvent.LISTENING_STARTED)
 
+            t_mic_start = time.time()
             try:
                 res = self.mic.record_chunk(duration_seconds=record_seconds)
                 if isinstance(res, tuple):
@@ -84,12 +86,14 @@ class VoiceSession:
                 self._set_state(VoiceState.IDLE)
                 return "Microphone unavailable.", None
 
+            t_mic_end = time.time()
             self.emit_event(VoiceEvent.SPEECH_DETECTED)
 
             # 2. State: PROCESSING (STT Transcription)
             self._set_state(VoiceState.PROCESSING)
             self.emit_event(VoiceEvent.TRANSCRIPTION_STARTED)
 
+            t_stt_start = time.time()
             try:
                 transcript = self.stt.transcribe(pcm_data, sample_rate=sample_rate)
             except STTError as se:
@@ -101,7 +105,8 @@ class VoiceSession:
                 self._set_state(VoiceState.IDLE)
                 return error_speech, None
 
-
+            t_stt_end = time.time()
+            stt_latency = t_stt_end - t_stt_start
             self.emit_event(VoiceEvent.TRANSCRIPTION_COMPLETED, {"transcript": transcript})
 
             # Check for Empty Transcript
@@ -115,22 +120,40 @@ class VoiceSession:
             self.emit_event(VoiceEvent.PROCESSING_STARTED)
 
             # 3. Pass Transcript to ASTRA Core Agent Execution Path
+            t_agent_start = time.time()
             response_text, tool_result = self.agent.process_command(transcript)
+            t_agent_end = time.time()
+            agent_latency = t_agent_end - t_agent_start
             self.emit_event(VoiceEvent.PROCESSING_COMPLETED, {"response": response_text})
 
             # 4. State: SPEAKING (Route Natural Language Response to TTS)
             self._set_state(VoiceState.SPEAKING)
             self.emit_event(VoiceEvent.TTS_STARTED)
 
+            t_tts_start = time.time()
             # Clean response text for TTS output (strip symbols like ✓)
             clean_speech_text = response_text.replace("✓", "").strip()
             self.tts.speak(clean_speech_text)
+            t_tts_end = time.time()
+            tts_latency = t_tts_end - t_tts_start
 
             self.emit_event(VoiceEvent.TTS_COMPLETED)
+
+            # Total Turn Latency
+            t_total = time.time() - t_start
+            if getattr(self.config, "performance_logging", True):
+                logger.info(
+                    f"[PERF] Audio Capture: {(t_mic_end - t_mic_start):.2f}s | "
+                    f"STT: {stt_latency:.2f}s | "
+                    f"LLM/Agent: {agent_latency:.2f}s | "
+                    f"TTS: {tts_latency:.2f}s | "
+                    f"Total Turn: {t_total:.2f}s"
+                )
 
             # 5. Return to IDLE
             self._set_state(VoiceState.IDLE)
             return response_text, tool_result
+
 
         except Exception as e:
             logger.error(f"Unhandled error in VoiceSession loop: {e}", exc_info=True)

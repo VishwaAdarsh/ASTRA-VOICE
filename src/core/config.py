@@ -24,6 +24,8 @@ class Config:
         log_path_str = os.getenv("LOG_FILE_PATH", "data/logs/astra.log")
         self.log_file = self.root_dir / log_path_str
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        self.performance_logging = os.getenv("PERFORMANCE_LOGGING", "true").lower() in ("true", "1", "yes")
+
 
         # Screenshots output directory
         self.screenshots_dir = self.root_dir / "data" / "screenshots"

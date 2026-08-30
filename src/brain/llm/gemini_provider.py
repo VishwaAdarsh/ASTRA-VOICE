@@ -46,6 +46,8 @@ class GeminiProvider(LLMProvider):
 
         try:
             self.client = genai.Client(api_key=self.api_key)
+            self._cached_gemini_tools: list[types.Tool] | None = None
+            self._cached_schema_len: int = 0
             logger.info(f"Initialized GeminiProvider (model='{self.model_name}')")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini Client: {e}")
@@ -54,9 +56,13 @@ class GeminiProvider(LLMProvider):
     def _convert_tool_schemas(
         self, tool_schemas: list[dict[str, Any]] | None
     ) -> list[types.Tool] | None:
-        """Convert ASTRA tool schemas to Gemini API Tool FunctionDeclarations."""
+        """Convert ASTRA tool schemas to Gemini API Tool FunctionDeclarations with caching."""
         if not tool_schemas:
             return None
+
+        if self._cached_gemini_tools is not None and len(tool_schemas) == self._cached_schema_len:
+            return self._cached_gemini_tools
+
 
         function_declarations: list[types.FunctionDeclaration] = []
         for schema in tool_schemas:
@@ -84,7 +90,11 @@ class GeminiProvider(LLMProvider):
         if not function_declarations:
             return None
 
-        return [types.Tool(function_declarations=function_declarations)]
+        converted = [types.Tool(function_declarations=function_declarations)]
+        self._cached_gemini_tools = converted
+        self._cached_schema_len = len(tool_schemas)
+        return converted
+
 
     def generate(self, prompt: str, system_prompt: str | None = None) -> str:
         """Generate text completion from Google Gemini API."""

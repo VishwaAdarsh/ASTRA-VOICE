@@ -44,7 +44,16 @@ class LLMClient:
                 )
                 return decision
             except Exception as e:
-                logger.warning(f"LLM attempt {attempts} failed: {e}")
+                err_str = str(e)
+                logger.warning(f"LLM attempt {attempts} failed: {err_str}")
+                # For daily quota exhaustion, abort retries immediately to avoid latency and spam
+                if "RESOURCE_EXHAUSTED" in err_str or "Quota exceeded" in err_str or "429" in err_str:
+                    logger.error("LLM Quota exhausted. Aborting retries immediately.")
+                    return LLMDecision(
+                        decision_type=DecisionType.ERROR,
+                        message="LLM quota limit reached.",
+                        reason=err_str,
+                    )
                 if attempts >= max_attempts:
                     logger.error(f"LLM max retry limit reached. Failure: {e}")
                     return LLMDecision(
@@ -52,3 +61,4 @@ class LLMClient:
                         message="LLM provider unavailable.",
                         reason=str(e),
                     )
+

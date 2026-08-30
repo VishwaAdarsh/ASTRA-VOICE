@@ -244,17 +244,23 @@ class AstraAgent:
                     f"If another action is required to fulfill the request, select the next appropriate tool."
                 )
 
+                t_llm_start = time.time()
                 decision = self.llm_client.generate_decision(
                     prompt=full_prompt,
                     system_prompt=ASTRA_SYSTEM_PROMPT_V1,
                     tool_schemas=tool_schemas,
                 )
+                t_llm_end = time.time()
+                llm_latency = t_llm_end - t_llm_start
 
                 # Case 1: Final Conversational Response (Task Completed)
                 if decision.decision_type == DecisionType.RESPONSE:
                     response_text = decision.message or "Task completed."
                     final_result = last_tool_result or ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
                     self.context_manager.record_turn_result(response_text)
+                    total_agent_time = time.time() - start_time
+                    if getattr(self.config, "performance_logging", True):
+                        logger.info(f"[PERF] Agent Completed (Iteration {iteration}): LLM={llm_latency:.2f}s | Total Agent={total_agent_time:.2f}s")
                     logger.info(f"AGENT_COMPLETED: Final response generated in iteration {iteration}")
                     return response_text, final_result
 
@@ -285,12 +291,22 @@ class AstraAgent:
                     seen_tool_signatures.append(call_sig)
 
                     # Execute tool through authoritative security and verification pipeline
+                    t_tool_start = time.time()
                     tool_request = ToolRequest(
                         tool_name=tool_name,
                         parameters=arguments,
                     )
                     tool_result = self.executor.execute(tool_request)
+                    t_tool_end = time.time()
+                    tool_latency = t_tool_end - t_tool_start
                     last_tool_result = tool_result
+
+                    if getattr(self.config, "performance_logging", True):
+                        logger.info(
+                            f"[PERF] Step {iteration}: LLM={llm_latency:.2f}s | "
+                            f"Tool ('{tool_name}')={tool_latency:.2f}s | "
+                            f"Step Total={(t_tool_end - t_llm_start):.2f}s"
+                        )
 
                     # Record step in local iteration history
                     tool_history.append({
@@ -313,7 +329,11 @@ class AstraAgent:
                     has_compound_intent = any(kw in raw_input.lower() for kw in (" and ", " then ", " after ", "find", "search", "look"))
                     if len(tool_history) == 1 and is_simple_open and not has_compound_intent:
                         response_text = self._format_response(tool_result)
+                        total_agent_time = time.time() - start_time
+                        if getattr(self.config, "performance_logging", True):
+                            logger.info(f"[PERF] Simple Fast-Path Completed: Total Agent={total_agent_time:.2f}s")
                         return response_text, tool_result
+
 
 
                 elif decision.decision_type == DecisionType.PLAN and decision.steps:

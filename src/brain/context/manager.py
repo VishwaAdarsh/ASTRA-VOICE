@@ -38,8 +38,9 @@ class ContextManager:
     def get_formatted_context_prompt(self) -> str:
         """Build formatted conversation history string for the LLM."""
         lines = []
-        # Include recent 5 turns
-        recent_turns = self.session.turns[-5:]
+        # Include past completed turns (excluding current in-flight turn if without assistant message)
+        completed_turns = [t for t in self.session.turns if t.assistant_message]
+        recent_turns = completed_turns[-5:]
         for turn in recent_turns:
             lines.append(f"User: {turn.user_message.content}")
             if turn.assistant_message:
@@ -47,7 +48,8 @@ class ContextManager:
             if turn.tool_name:
                 lines.append(f"Tool executed: {turn.tool_name}")
 
-        return "\n".join(lines)
+        return "\n".join(lines) if lines else "None (New Session)"
+
 
     def clear(self) -> None:
         """Clear active session context history."""

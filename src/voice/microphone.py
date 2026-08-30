@@ -26,9 +26,13 @@ class MicrophoneManager:
         self._stream: sd.InputStream | None = None
         self._is_capturing = False
         self.active_sample_rate = self.config.sample_rate
+        self._cached_default_device: dict[str, Any] | None = None
 
     def get_default_device_info(self) -> dict[str, Any]:
-        """Get device info for default or configured input device."""
+        """Get device info for default or configured input device with caching."""
+        if self._cached_default_device is not None:
+            return self._cached_default_device
+
         try:
             dev_idx = self.config.device_index if self.config.device_index is not None else sd.default.device[0]
             if dev_idx is not None and dev_idx >= 0:
@@ -36,15 +40,18 @@ class MicrophoneManager:
                 if isinstance(dev_info, list) and dev_info:
                     dev_info = dev_info[0]
                 if isinstance(dev_info, dict):
-                    return {
+                    res = {
                         "index": dev_idx,
                         "name": dev_info.get("name", "Default Microphone"),
                         "sample_rate": int(dev_info.get("default_samplerate", 44100)),
                         "channels": int(dev_info.get("max_input_channels", 1)),
                     }
+                    self._cached_default_device = res
+                    return res
 
         except Exception as e:
             logger.warning(f"Could not query default audio device: {e}")
+
 
         return {
             "index": None,
