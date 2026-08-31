@@ -87,7 +87,14 @@ def main():
 
     lifecycle = SystemLifecycle(config=config)
     agent = lifecycle.startup()
-    voice_mgr = VoiceManager(agent=agent)
+    voice_mgr = VoiceManager(agent=agent, config=config)
+
+    # Start Hands-Free Wake Word Subsystem
+    if config.wake_word_enabled:
+        voice_mgr.start_wake_word_listener()
+        print("[ASTRA] Voice system initialized")
+        print(f"[ASTRA] Wake word: {config.wake_word_phrase.title()}")
+        print("[ASTRA] Wake-word listening active")
 
     # Start FastAPI + WebSocket communication server
     server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=bound_port, host=host)
@@ -97,6 +104,7 @@ def main():
     def _sig_handler(sig, frame):
         print("\n[ASTRA] Shutdown signal received. Stopping server and engines...")
         server.should_exit = True
+        voice_mgr.shutdown()
         lifecycle.shutdown(agent)
         sys.exit(0)
 
@@ -112,7 +120,9 @@ def main():
             _sig_handler(None, None)
         finally:
             server.should_exit = True
+            voice_mgr.shutdown()
             lifecycle.shutdown(agent)
+
 
     elif args.cli:
         from src.interfaces.cli import InteractiveCLI
@@ -121,6 +131,7 @@ def main():
             cli.start()
         finally:
             server.should_exit = True
+            voice_mgr.shutdown()
             lifecycle.shutdown(agent)
 
     else:
@@ -139,6 +150,7 @@ def main():
                 sys.exit(app.exec())
             finally:
                 server.should_exit = True
+                voice_mgr.shutdown()
                 lifecycle.shutdown(agent)
 
         except Exception as e:
@@ -149,7 +161,9 @@ def main():
                 cli.start()
             finally:
                 server.should_exit = True
+                voice_mgr.shutdown()
                 lifecycle.shutdown(agent)
+
 
 
 if __name__ == "__main__":

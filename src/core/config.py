@@ -102,6 +102,13 @@ class Config:
         self.tts_volume = float(os.getenv("TTS_VOLUME", "1.0"))
         self.voice_language = os.getenv("VOICE_LANGUAGE", "en-US")
 
+        # Hands-Free Wake Word Subsystem Configuration
+        self.wake_word_enabled = os.getenv("WAKE_WORD_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.wake_word_phrase = os.getenv("WAKE_WORD_PHRASE", "hey astra").strip().lower()
+        self.wake_word_sensitivity = float(os.getenv("WAKE_WORD_SENSITIVITY", "0.6"))
+        self.wake_word_command_timeout = float(os.getenv("WAKE_WORD_COMMAND_TIMEOUT", "5.0"))
+
+
         # LLM Brain Configuration (Phase 4)
         self.llm_provider = os.getenv("LLM_PROVIDER", "mock").lower()
         self.llm_model = os.getenv("LLM_MODEL", "mock-astra-v1")

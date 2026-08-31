@@ -78,8 +78,20 @@ class VoiceManager:
             event_listener=event_listener,
         )
 
+        # Initialize Local Wake Word Subsystem
+        from src.voice.wake.engine import LocalWakeWordDetector, WakeWordListener
+        self.wake_detector = LocalWakeWordDetector(
+            wake_phrase=self.config.wake_word_phrase,
+            sensitivity=self.config.wake_word_sensitivity,
+        )
+        self.wake_listener = WakeWordListener(
+            voice_manager=self,
+            detector=self.wake_detector,
+            config=self.config,
+        )
+
         logger.info(
-            f"VoiceManager initialized (STT={self.voice_config.stt_provider}, TTS={self.voice_config.tts_provider})"
+            f"VoiceManager initialized (STT={self.voice_config.stt_provider}, TTS={self.voice_config.tts_provider}, WakeWord='{self.config.wake_word_phrase}')"
         )
 
     @property
@@ -91,14 +103,35 @@ class VoiceManager:
         """Get audio diagnostics for input hardware."""
         return self.mic.get_diagnostics()
 
+    def start_wake_word_listener(self) -> None:
+        """Start continuous hands-free 'Hey ASTRA' background listener."""
+        if self.config.wake_word_enabled and self.wake_listener:
+            self.wake_listener.start()
+
+    def stop_wake_word_listener(self) -> None:
+        """Stop background wake word listener."""
+        if self.wake_listener:
+            self.wake_listener.stop()
+
     def listen_and_process(self, duration_seconds: float = 3.0):
-        """Execute a single voice turn interaction."""
+        """Execute a single voice turn interaction (e.g. manual microphone button trigger)."""
+        if self.wake_listener:
+            self.wake_listener.suppress(duration_sec=duration_seconds + 2.0)
         return self.session.listen_and_process(record_seconds=duration_seconds)
 
     def speak(self, text: str) -> None:
-        """Speak response text aloud."""
+        """Speak response text aloud with wake-word self-trigger suppression."""
+        if self.wake_listener:
+            self.wake_listener.suppress(duration_sec=3.0)
         self.tts.speak(text)
 
     def stop_speaking(self) -> None:
         """Interrupt active speech playback."""
         self.session.stop_speaking()
+
+    def shutdown(self) -> None:
+        """Cleanly shutdown voice subsystem and background threads."""
+        self.stop_speaking()
+        self.stop_wake_word_listener()
+        logger.info("VoiceManager shutdown complete.")
+

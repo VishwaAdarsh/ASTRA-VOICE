@@ -12,10 +12,12 @@ class VoiceState(str, Enum):
     """Explicit voice interaction state machine states."""
 
     IDLE = "IDLE"
+    WAKE_WORD_LISTENING = "WAKE_WORD_LISTENING"
     LISTENING = "LISTENING"
     PROCESSING = "PROCESSING"
     SPEAKING = "SPEAKING"
     ERROR = "ERROR"
+
 
 
 @dataclass
