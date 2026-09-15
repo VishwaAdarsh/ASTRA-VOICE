@@ -18,5 +18,11 @@ class VisionProviderFactory:
         cfg = config or Config()
         provider_name = cfg.vision_provider.strip().lower()
 
-        logger.info(f"Creating VisionProvider for '{provider_name}'")
-        return MockVisionProvider()
+        if provider_name in ("mock", "test", "default", ""):
+            return MockVisionProvider()
+        raise NotImplementedError(
+            f"Vision provider '{provider_name}' is not yet registered. "
+            "Real Vision integration is scheduled for Phase V2-02. "
+            "Set VISION_PROVIDER=mock for testing."
+        )
+

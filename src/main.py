@@ -1,10 +1,17 @@
 """
-ASTRA Main Entry Point.
-Launches the PySide6 Desktop Interface by default, or Terminal CLI / Voice mode via flags.
+ASTRA Legacy Compatibility Entry Point.
+[LEGACY / COMPATIBILITY ONLY]
+
+The canonical production entry point for ASTRA V2 is root `main.py`:
+    python main.py
+
+This file (`src/main.py`) is retained for backward compatibility with earlier
+scripts and development tooling that launched the older native PySide6 UI.
 """
 
 import os
 import sys
+import warnings
 from pathlib import Path
 
 # Force UTF-8 encoding for standard output on Windows consoles
@@ -21,15 +28,19 @@ from src.ui.app import launch_ui
 
 
 def main():
-    """Main application execution point."""
+    """Legacy application execution point."""
+    print("[ASTRA] Notice: 'src/main.py' is a legacy entry point. For the full production")
+    print("[ASTRA] system (FastAPI + WebSocket + React WebEngine UI), run 'python main.py'.\n")
+
     if "--cli" in sys.argv or "-c" in sys.argv:
         run_cli(start_in_voice_mode=False)
     elif "--voice" in sys.argv or "-v" in sys.argv:
         run_cli(start_in_voice_mode=True)
     else:
-        # Default: Launch PySide6 Desktop GUI Interface
+        # Launch legacy native PySide6 Desktop GUI Interface
         launch_ui()
 
 
 if __name__ == "__main__":
     main()
+

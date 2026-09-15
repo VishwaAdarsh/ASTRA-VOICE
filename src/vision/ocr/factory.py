@@ -18,5 +18,11 @@ class OCRProviderFactory:
         cfg = config or Config()
         provider_name = cfg.ocr_provider.strip().lower()
 
-        logger.info(f"Creating OCRProvider for '{provider_name}'")
-        return MockOCRProvider()
+        if provider_name in ("mock", "test", "default", ""):
+            return MockOCRProvider()
+        raise NotImplementedError(
+            f"OCR provider '{provider_name}' is not yet registered. "
+            "Real OCR integration is scheduled for Phase V2-02. "
+            "Set OCR_PROVIDER=mock for testing."
+        )
+

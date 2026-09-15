@@ -23,5 +23,12 @@ class SearchProviderFactory:
 
         if provider_name in ("duckduckgo", "ddg"):
             return DuckDuckGoSearchProvider()
-        else:
+        elif provider_name in ("mock", "test", "default"):
             return MockSearchProvider()
+        else:
+            raise ValueError(
+                f"Unsupported web search provider '{cfg.web_search_provider}'. "
+                "Explicit provider configuration required ('duckduckgo' or 'mock'). "
+                "Silent fallback to mock is prohibited."
+            )
+
