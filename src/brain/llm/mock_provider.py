@@ -12,6 +12,23 @@ from src.brain.llm.provider import LLMProvider
 class MockLLMProvider(LLMProvider):
     """Mock LLM Provider for testing without external API calls or network dependency."""
 
+    def __init__(self, config: ModelConfig | None = None):
+        super().__init__(config=config)
+        self.capabilities = {"text", "structured"}
+
+    def check_health(self) -> dict[str, Any]:
+        """Check mock provider health."""
+        return {
+            "status": "healthy",
+            "provider": "mock",
+            "model": self.config.model_name or "mock-model",
+            "capabilities": list(self.capabilities),
+        }
+
+    def generate_stream(self, prompt: str, system_prompt: str | None = None):
+        """Stream mock response."""
+        yield self.generate(prompt, system_prompt)
+
     def generate(self, prompt: str, system_prompt: str | None = None) -> str:
         return f"Mock LLM completion for: '{prompt}'"
 

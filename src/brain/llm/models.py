@@ -25,11 +25,21 @@ class ModelConfig:
 
     provider: str = "mock"
     model: str = "mock-astra-v1"
+    model_name: str = ""
     temperature: float = 0.2
     max_output_tokens: int = 512
     timeout: float = 10.0
     retry_count: int = 2
+    initial_backoff: float = 1.0
+    max_backoff: float = 30.0
+    backoff_factor: float = 2.0
     api_key: str = ""
+
+    def __post_init__(self):
+        if not self.model_name and self.model:
+            self.model_name = self.model
+        elif self.model_name and not self.model:
+            self.model = self.model_name
 
 
 @dataclass
@@ -42,6 +52,9 @@ class LLMUsage:
     latency_ms: float = 0.0
 
 
+from src.brain.llm.errors import LLMErrorType
+
+
 @dataclass
 class LLMDecision:
     """Structured decision output produced by the LLM Reasoning Engine."""
@@ -51,7 +64,11 @@ class LLMDecision:
     arguments: dict[str, Any] = field(default_factory=dict)
     message: str | None = None
     reason: str | None = None
+    error_type: LLMErrorType | None = None
+    retry_after: float | None = None
+    retryable: bool = False
     steps: list[dict[str, Any]] = field(default_factory=list)
     confidence: float = 1.0
     usage: LLMUsage = field(default_factory=LLMUsage)
     raw_response: str = ""
+

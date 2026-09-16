@@ -68,17 +68,28 @@ class VerificationError(AstraError):
     pass
 
 
-# LLM Subsystem Exceptions (Phase 4)
+# LLM Subsystem Exceptions (Phase 4 & Phase V2-02)
 class LLMError(AstraError):
     """Base exception for LLM Subsystem errors."""
 
     pass
 
 
-class LLMProviderError(LLMError):
-    """Raised when an LLM provider API call fails or times out."""
+from src.brain.llm.errors import (
+    LLMErrorType,
+    LLMProviderError,
+    LLMAuthError,
+    LLMConfigError,
+    LLMRateLimitError,
+    LLMQuotaExhaustedError,
+    LLMNetworkError,
+    LLMTimeoutError,
+    LLMServiceUnavailableError,
+    LLMInvalidRequestError,
+    LLMContentPolicyError,
+    LLMModelNotFoundError,
+)
 
-    pass
 
 
 class LLMValidationError(LLMError):

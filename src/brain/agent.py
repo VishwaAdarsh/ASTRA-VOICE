@@ -129,7 +129,11 @@ class AstraAgent:
             retry_count=self.config.llm_retry_count,
             api_key=self.config.llm_api_key,
         )
-        self.llm_client = LLMClient(config=model_config, provider=llm_provider)
+        self.llm_client = LLMClient(
+            config=model_config,
+            provider=llm_provider,
+            health_manager=self.health_manager,
+        )
 
 
         # Register standard allowlisted tools
@@ -187,14 +191,19 @@ class AstraAgent:
 
 
 
-    def process_command(self, raw_input: str) -> tuple[str, ToolResult]:
+    def process_command(self, raw_input: str | Command) -> tuple[str, ToolResult]:
         """Process a user command through the Controlled Multi-Step Agent Orchestration Loop."""
+        if isinstance(raw_input, Command):
+            command = raw_input
+            raw_input_text = raw_input.raw_text
+        else:
+            raw_input_text = str(raw_input)
+            command = Command(
+                raw_text=raw_input_text,
+                normalized_text=raw_input_text.strip().lower(),
+            )
+        raw_input = raw_input_text
         logger.info(f"AGENT_REQUEST_STARTED: '{raw_input}'")
-
-        command = Command(
-            raw_text=raw_input,
-            normalized_text=raw_input.strip().lower(),
-        )
 
         # Add user message to Context Manager
         self.context_manager.add_user_message(raw_input)
@@ -356,8 +365,10 @@ class AstraAgent:
                     return response_text, last_result or ToolResult(status=ExecutionStatus.SUCCESS, message="Plan executed.")
 
                 else:
-                    logger.info("LLM returned fallback/error decision. Invoking fallback engine.")
-                    return self._fallback_execution(command)
+                    logger.info(
+                        f"LLM returned fallback/error decision (type={decision.decision_type}). Invoking fallback engine."
+                    )
+                    return self._fallback_execution(command, error_decision=decision)
 
             # Reached max iterations limit
             logger.warning(f"AGENT_MAX_ITERATIONS_REACHED: {max_iterations}")
@@ -368,13 +379,15 @@ class AstraAgent:
             )
             return "I reached the maximum number of steps allowed for this task.", max_iter_res
 
-
         except Exception as e:
             logger.error(f"Error during agent orchestration: {e}. Switching to fallback engine.", exc_info=True)
             return self._fallback_execution(command)
 
-
-    def _fallback_execution(self, command: Command) -> tuple[str, ToolResult]:
+    def _fallback_execution(
+        self,
+        command: Command,
+        error_decision: LLMDecision | None = None,
+    ) -> tuple[str, ToolResult]:
         """Deterministic Rule-Based Fallback Engine."""
         logger.info(f"FALLBACK_ENGINE: Processing command '{command.raw_text}'")
         intent = self.fallback_recognizer.recognize(command)
@@ -394,6 +407,16 @@ class AstraAgent:
             return resp, result
 
         if intent.intent_type == IntentType.UNKNOWN:
+            # If the LLM suffered an explicit error (quota, auth, provider failure), communicate truthfully
+            if error_decision and error_decision.decision_type == DecisionType.ERROR:
+                err_msg = error_decision.message or "I couldn't process your request due to an LLM provider error."
+                result = ToolResult(
+                    status=ExecutionStatus.FAILED,
+                    message=err_msg,
+                    error=error_decision.reason or "LLM provider error",
+                )
+                return err_msg, result
+
             result = ToolResult(
                 status=ExecutionStatus.NOT_FOUND,
                 message="I don't understand that command yet.",
@@ -406,7 +429,6 @@ class AstraAgent:
         response_text = self._format_response(tool_result)
         self.context_manager.record_turn_result(response_text, tool_request.tool_name, tool_result.data)
         return response_text, tool_result
-
 
     def _format_response(self, result: ToolResult) -> str:
         """Format ToolResult into a clean, truthful assistant response string."""
@@ -423,11 +445,14 @@ class AstraAgent:
             reason = result.error or result.message or "Execution or verification failed."
             return f"I couldn't complete that action: {reason}"
 
-
-
     def shutdown(self) -> None:
         """Shutdown background subsystems and timers."""
         if hasattr(self, "automation_manager"):
             self.automation_manager.stop_all_automations()
+        if hasattr(self, "llm_client"):
+            try:
+                self.llm_client.shutdown()
+            except Exception as e:
+                logger.warning(f"Error during LLMClient shutdown: {e}")
 
 

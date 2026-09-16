@@ -38,3 +38,24 @@ def test_llm_client_execution():
     assert decision.decision_type == DecisionType.TOOL_CALL
     assert decision.tool_name == "open_folder"
     assert decision.arguments == {"folder_name": "downloads"}
+
+
+def test_mock_provider_capabilities_and_health():
+    config = ModelConfig(provider="mock")
+    provider = LLMProviderFactory.create(config)
+
+    assert "text" in provider.capabilities
+    assert "structured" in provider.capabilities
+
+    health = provider.check_health()
+    assert health["status"] == "healthy"
+    assert health["provider"] == "mock"
+
+    # Streaming test
+    chunks = list(provider.generate_stream("test prompt"))
+    assert len(chunks) == 1
+    assert "test prompt" in chunks[0]
+
+    # Shutdown test
+    provider.shutdown()
+
