@@ -3,7 +3,7 @@ import { useApp } from "../context/AppContext";
 import { WebGLOrb } from "./WebGLOrb";
 
 export const Header = () => {
-  const { currentView, setCurrentView, assistantState } = useApp();
+  const { currentView, setCurrentView, assistantState, isBackendConnected, connectionState } = useApp();
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -14,7 +14,7 @@ export const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 w-full z-40 flex justify-between items-center px-6 md:px-12 h-16 bg-[#121415]/70 backdrop-blur-xl border-b border-white/[0.04]">
-      {/* Left Title / Greeting */}
+      {/* Left Title / Greeting & Connection Badge */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => setCurrentView("home")}
@@ -29,6 +29,16 @@ export const Header = () => {
             {currentView === "home" ? getGreeting() : "Astra"}
           </span>
         </button>
+
+        {!isBackendConnected && (
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium"
+            title={`ASTRA Engine State: ${connectionState || 'OFFLINE'}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span>{connectionState === 'RECONNECTING' ? 'Reconnecting...' : 'Engine Offline'}</span>
+          </div>
+        )}
       </div>
 
       {/* Center Mini Ambient Indicator when not on Home screen */}

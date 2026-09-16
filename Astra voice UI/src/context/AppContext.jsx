@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { voiceService } from '../services/voiceService';
-import { astraApi } from '../services/api';
+import { astraApi, generateRequestId } from '../services/api';
 import confetti from 'canvas-confetti';
-
 
 const AppContext = createContext(null);
 
 export const AppProvider = ({ children }) => {
   const [currentView, setCurrentView] = useState('home');
   const [assistantState, setAssistantState] = useState('idle'); // 'idle' | 'listening' | 'thinking' | 'speaking'
+  const [commandStatus, setCommandStatus] = useState('IDLE'); // 'IDLE' | 'SUBMITTING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED'
   const [interimTranscript, setInterimTranscript] = useState('');
   const [audioLevel, setAudioLevel] = useState(0);
 
@@ -20,8 +20,8 @@ export const AppProvider = ({ children }) => {
       id: 'msg-1',
       sender: 'astra',
       text: 'Good morning! I am Astra, your desktop personal AI assistant. How can I help you today?',
-      timestamp: '09:00 AM'
-    }
+      timestamp: '09:00 AM',
+    },
   ]);
   const [settings, setSettings] = useState({
     voiceName: 'Aura',
@@ -34,10 +34,11 @@ export const AppProvider = ({ children }) => {
     shaderIntensity: 1.0,
     orbColor: '#7c5cfc',
     llm_provider: 'mock',
-    permissions_mode: 'NORMAL'
+    permissions_mode: 'NORMAL',
   });
   const [healthStatus, setHealthStatus] = useState({ status: 'HEALTHY', subsystems: {} });
   const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState(astraApi.connectionState);
 
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -46,7 +47,7 @@ export const AppProvider = ({ children }) => {
     itemDetails: null,
     onConfirm: null,
     onCancel: null,
-    timer: 6
+    timer: 6,
   });
 
   const [toastMessage, setToastMessage] = useState(null);
@@ -64,7 +65,7 @@ export const AppProvider = ({ children }) => {
         astraApi.getTasks().catch(() => []),
         astraApi.getAutomations().catch(() => []),
         astraApi.getMemories().catch(() => []),
-        astraApi.getSettings().catch(() => null)
+        astraApi.getSettings().catch(() => null),
       ]);
 
       if (healthData) {
@@ -89,21 +90,41 @@ export const AppProvider = ({ children }) => {
     // Listen to real-time events from Python ASTRA Engine
     const unbindConn = astraApi.on('connection_changed', (data) => {
       setIsBackendConnected(data.connected);
+      setConnectionState(data.state);
       if (data.connected) {
         showToast('Connected to ASTRA Engine', 'cloud_done');
         loadBackendData();
       } else {
-        showToast('ASTRA Engine Disconnected', 'cloud_off');
+        showToast('ASTRA Engine Offline', 'cloud_off');
+        setAssistantState('idle');
+        setCommandStatus((prev) => {
+          if (prev === 'PROCESSING' || prev === 'SUBMITTING') {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setMessages((msgs) => [
+              ...msgs,
+              {
+                id: 'msg-' + Date.now(),
+                sender: 'astra',
+                text: 'Connection interrupted while processing your request. Reconnecting...',
+                timestamp: timeStr,
+              },
+            ]);
+            return 'INTERRUPTED';
+          }
+          return 'IDLE';
+        });
       }
     });
 
     const unbindBrainStarted = astraApi.on('BRAIN_STARTED', (data) => {
       setAssistantState('thinking');
+      setCommandStatus('PROCESSING');
       if (data.input) setInterimTranscript(`Processing: "${data.input}"`);
     });
 
     const unbindBrainCompleted = astraApi.on('BRAIN_COMPLETED', (data) => {
       setAssistantState('idle');
+      setCommandStatus('COMPLETED');
       setInterimTranscript('');
       if (data.response) {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -113,7 +134,7 @@ export const AppProvider = ({ children }) => {
           text: data.response,
           timestamp: timeStr,
           widgetType: data.widgetType,
-          widgetData: data.widgetData
+          widgetData: data.widgetData,
         };
         setMessages((prev) => [...prev, astraMsg]);
       }
@@ -129,7 +150,9 @@ export const AppProvider = ({ children }) => {
 
     const unbindError = astraApi.on('ERROR_OCCURRED', (data) => {
       setAssistantState('idle');
-      showToast(data.message || 'Engine Error', 'error');
+      setCommandStatus('FAILED');
+      const errMessage = (data.error && data.error.message) || data.message || 'Engine Error';
+      showToast(errMessage, 'error');
     });
 
     return () => {
@@ -157,74 +180,61 @@ export const AppProvider = ({ children }) => {
       id: 'msg-' + Date.now(),
       sender: 'user',
       text: queryText,
-      timestamp: timeStr
+      timestamp: timeStr,
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setAssistantState('thinking');
     setInterimTranscript('');
 
-    try {
-      if (isBackendConnected) {
-        // Send command to Python AstraAgent (Single Source of Truth)
-        await astraApi.sendCommand(queryText);
-      } else {
-        // Honest offline notification - no fake local assistant brain
-        const astraMsg = {
-          id: 'msg-' + (Date.now() + 1),
-          sender: 'astra',
-          text: 'ASTRA Engine is currently offline. Please ensure the Python backend server is running.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages((prev) => [...prev, astraMsg]);
-        setAssistantState('idle');
-      }
+    if (!isBackendConnected) {
+      // Truthful offline notification - no fake local assistant brain
+      setCommandStatus('FAILED');
+      setAssistantState('idle');
+      const astraMsg = {
+        id: 'msg-' + (Date.now() + 1),
+        sender: 'astra',
+        text: 'ASTRA Engine is currently offline. Please ensure the Python backend server is running.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, astraMsg]);
+      showToast('ASTRA Engine Offline', 'cloud_off');
+      return;
+    }
 
+    setAssistantState('thinking');
+    setCommandStatus('SUBMITTING');
+
+    try {
+      const reqId = generateRequestId();
+      await astraApi.sendCommand(queryText, reqId);
+      // Processing state will be updated by BRAIN_STARTED and BRAIN_COMPLETED WebSocket events
     } catch (err) {
       console.error('[AppContext] Error sending command:', err);
       setAssistantState('idle');
-      showToast('Error communicating with ASTRA Engine', 'error');
+      setCommandStatus('FAILED');
+      showToast(err.message || 'Error communicating with ASTRA Engine', 'error');
     }
   }, [isBackendConnected, showToast]);
 
   // Voice Listening trigger
   const startVoiceInput = useCallback(async () => {
+    if (!isBackendConnected) {
+      showToast('Voice input unavailable: ASTRA Engine is offline', 'cloud_off');
+      return;
+    }
+
     voiceService.stopSpeaking();
     setAssistantState('listening');
     setInterimTranscript('Listening...');
 
-    if (isBackendConnected) {
-      try {
-        await astraApi.triggerVoiceListen();
-      } catch (e) {
-        voiceService.startListening({
-          onInterim: (text) => setInterimTranscript(text),
-          onFinal: (text) => {
-            setInterimTranscript(text);
-            processQuery(text);
-          },
-          onError: (err) => {
-            setAssistantState('idle');
-            setInterimTranscript('');
-            showToast('Voice input: ' + err, 'mic_off');
-          }
-        });
-      }
-    } else {
-      voiceService.startListening({
-        onInterim: (text) => setInterimTranscript(text),
-        onFinal: (text) => {
-          setInterimTranscript(text);
-          processQuery(text);
-        },
-        onError: (err) => {
-          setAssistantState('idle');
-          setInterimTranscript('');
-          showToast('Voice input: ' + err, 'mic_off');
-        }
-      });
+    try {
+      await astraApi.triggerVoiceListen();
+    } catch (e) {
+      setAssistantState('idle');
+      setInterimTranscript('');
+      showToast('Error triggering voice listener: ' + (e.message || 'unavailable'), 'mic_off');
     }
-  }, [isBackendConnected, processQuery, showToast]);
+  }, [isBackendConnected, showToast]);
 
   const stopVoiceInput = useCallback(() => {
     voiceService.stopListening();
@@ -245,20 +255,20 @@ export const AppProvider = ({ children }) => {
     }
   }, [isBackendConnected, settings]);
 
-  // Task Engine CRUD
+  // Task Engine CRUD - Authoritative Backend Only
   const addTask = async (tsk) => {
-    if (isBackendConnected) {
-      try {
-        const newTsk = await astraApi.createTask(tsk.title, tsk.category);
-        setTasks((prev) => [newTsk, ...prev]);
-        showToast('Task submitted to ASTRA Task Engine');
-        confetti({ particleCount: 20, spread: 45, origin: { y: 0.85 } });
-      } catch (e) {
-        showToast('Error creating task', 'error');
-      }
-    } else {
-      setTasks((prev) => [{ ...tsk, id: 'tsk-' + Date.now() }, ...prev]);
-      showToast('Task added');
+    if (!isBackendConnected) {
+      showToast('Cannot add task: ASTRA Engine is offline', 'cloud_off');
+      return;
+    }
+
+    try {
+      const newTsk = await astraApi.createTask(tsk.title, tsk.category);
+      setTasks((prev) => [newTsk, ...prev]);
+      showToast('Task submitted to ASTRA Task Engine');
+      confetti({ particleCount: 20, spread: 45, origin: { y: 0.85 } });
+    } catch (e) {
+      showToast('Error creating task: ' + (e.message || 'Failed'), 'error');
     }
   };
 
@@ -273,19 +283,19 @@ export const AppProvider = ({ children }) => {
     showToast('Task removed', 'delete');
   };
 
-  // Automations CRUD
+  // Automations CRUD - Authoritative Backend Only
   const addReminder = async (rem) => {
-    if (isBackendConnected) {
-      try {
-        const newRem = await astraApi.createAutomation(rem.title, rem.time || '09:00', rem.title);
-        setReminders((prev) => [newRem, ...prev]);
-        showToast('Automation scheduled in ASTRA Engine');
-      } catch (e) {
-        showToast('Error creating automation', 'error');
-      }
-    } else {
-      setReminders((prev) => [{ ...rem, id: 'rem-' + Date.now() }, ...prev]);
-      showToast('Reminder added');
+    if (!isBackendConnected) {
+      showToast('Cannot create reminder: ASTRA Engine is offline', 'cloud_off');
+      return;
+    }
+
+    try {
+      const newRem = await astraApi.createAutomation(rem.title, rem.time || '09:00', rem.title);
+      setReminders((prev) => [newRem, ...prev]);
+      showToast('Automation scheduled in ASTRA Engine');
+    } catch (e) {
+      showToast('Error creating automation: ' + (e.message || 'Failed'), 'error');
     }
   };
 
@@ -300,19 +310,19 @@ export const AppProvider = ({ children }) => {
     showToast('Reminder deleted', 'delete');
   };
 
-  // Memory CRUD
+  // Memory CRUD - Authoritative Backend Only
   const addNote = async (not) => {
-    if (isBackendConnected) {
-      try {
-        const newMem = await astraApi.addMemory(not.body || not.title);
-        setNotes((prev) => [newMem, ...prev]);
-        showToast('Fact remembered by ASTRA Memory Subsystem');
-      } catch (e) {
-        showToast('Error storing memory', 'error');
-      }
-    } else {
-      setNotes((prev) => [{ ...not, id: 'not-' + Date.now() }, ...prev]);
-      showToast('Note created');
+    if (!isBackendConnected) {
+      showToast('Cannot save note: ASTRA Engine is offline', 'cloud_off');
+      return;
+    }
+
+    try {
+      const newMem = await astraApi.addMemory(not.body || not.title);
+      setNotes((prev) => [newMem, ...prev]);
+      showToast('Fact remembered by ASTRA Memory Subsystem');
+    } catch (e) {
+      showToast('Error storing memory: ' + (e.message || 'Failed'), 'error');
     }
   };
 
@@ -328,6 +338,8 @@ export const AppProvider = ({ children }) => {
         setCurrentView,
         assistantState,
         setAssistantState,
+        commandStatus,
+        setCommandStatus,
         interimTranscript,
         audioLevel,
         reminders,
@@ -346,6 +358,7 @@ export const AppProvider = ({ children }) => {
         setSettings,
         healthStatus,
         isBackendConnected,
+        connectionState,
         processQuery,
         startVoiceInput,
         stopVoiceInput,

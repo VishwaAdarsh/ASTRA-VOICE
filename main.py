@@ -13,12 +13,14 @@ Usage:
 """
 
 import argparse
+import json
 import signal
 import socket
 import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any, Optional
 import uvicorn
 
 # Add project root to sys.path
@@ -52,11 +54,49 @@ def find_available_port(preferred_port: int = 8000, host: str = "127.0.0.1") -> 
     return preferred_port
 
 
-def start_server_thread(agent, voice_manager, port: int = 8000, host: str = "127.0.0.1"):
+def write_runtime_config(host: str, port: int, version: str = __version__) -> dict[str, Any]:
+    """Write sanitized runtime configuration for dynamic UI discovery without hardcoded ports."""
+    runtime_info = {
+        "apiBaseUrl": f"http://{host}:{port}/api/v1",
+        "wsUrl": f"ws://{host}:{port}/api/v1/ws",
+        "host": f"{host}:{port}",
+        "port": port,
+        "version": version,
+        "environment": "desktop",
+        "capabilities": ["text", "voice", "tools", "vision", "memory", "automations"],
+    }
+    targets = [
+        root_dir / "Astra voice UI" / "public" / "astra_runtime_config.json",
+        root_dir / "Astra voice UI" / "dist" / "astra_runtime_config.json",
+        root_dir / "data" / "runtime_config.json",
+    ]
+    for target in targets:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(runtime_info, f, indent=2)
+        except Exception:
+            pass
+    return runtime_info
+
+
+def start_server_thread(
+    agent,
+    voice_manager,
+    port: int = 8000,
+    host: str = "127.0.0.1",
+    runtime_config: Optional[dict[str, Any]] = None,
+):
     """Run uvicorn FastAPI server in background thread."""
     from src.api.server import create_app
 
-    app = create_app(agent=agent, voice_manager=voice_manager)
+    app = create_app(
+        agent=agent,
+        voice_manager=voice_manager,
+        port=port,
+        host=host,
+        runtime_config=runtime_config,
+    )
     config = uvicorn.Config(app=app, host=host, port=port, log_level="warning")
     server = uvicorn.Server(config)
     server_thread = threading.Thread(target=server.run, daemon=True)
@@ -85,6 +125,8 @@ def main():
     print(f"[ASTRA] REST: http://{host}:{bound_port}/api/v1")
     print(f"[ASTRA] WebSocket: ws://{host}:{bound_port}/api/v1/ws")
 
+    runtime_config = write_runtime_config(host=host, port=bound_port, version=__version__)
+
     lifecycle = SystemLifecycle(config=config)
     agent = lifecycle.startup()
     voice_mgr = VoiceManager(agent=agent, config=config)
@@ -97,12 +139,23 @@ def main():
         print("[ASTRA] Wake-word listening active")
 
     # Start FastAPI + WebSocket communication server
-    server, server_thread = start_server_thread(agent=agent, voice_manager=voice_mgr, port=bound_port, host=host)
+    server, server_thread = start_server_thread(
+        agent=agent,
+        voice_manager=voice_mgr,
+        port=bound_port,
+        host=host,
+        runtime_config=runtime_config,
+    )
     time.sleep(0.4)  # Allow uvicorn socket binding
 
     # Register OS signal handlers for graceful shutdown
     def _sig_handler(sig, frame):
         print("\n[ASTRA] Shutdown signal received. Stopping server and engines...")
+        try:
+            if hasattr(server, "app") and hasattr(server.app, "state"):
+                server.app.state.lifecycle_state = "STOPPING"
+        except Exception:
+            pass
         server.should_exit = True
         voice_mgr.shutdown()
         lifecycle.shutdown(agent)

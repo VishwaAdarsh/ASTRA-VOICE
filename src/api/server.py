@@ -1,19 +1,38 @@
 """
-ASTRA FastAPI & WebSocket Communication Server.
+ASTRA FastAPI & WebSocket Communication Server (Phase V2-03 Upgraded).
 Bridges the React Stitch UI (frontend) with the Python ASTRA Engine (backend).
+Features dynamic endpoint discovery, bounded WebSocket envelopes, request correlation,
+idempotency protection, localhost CORS restrictions, and normalized error responses.
 """
 
 import asyncio
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Optional
+import uuid
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from src.brain.llm.errors import (
+    LLMAuthError,
+    LLMConfigError,
+    LLMContentPolicyError,
+    LLMInvalidRequestError,
+    LLMModelNotFoundError,
+    LLMNetworkError,
+    LLMProviderError,
+    LLMQuotaExhaustedError,
+    LLMRateLimitError,
+    LLMServiceUnavailableError,
+    LLMTimeoutError,
+)
 from src.core.config import Config
 from src.core.logger import get_logger
 from src.memory.models import MemoryType
@@ -22,7 +41,10 @@ from src.security.auditor import SecretRedactionFilter
 logger = get_logger()
 
 
+# ============================================================================
 # Request / Response Schemas
+# ============================================================================
+
 class CommandRequest(BaseModel):
     input: str
     request_id: Optional[str] = None
@@ -55,6 +77,47 @@ class SecurityConfirmRequest(BaseModel):
     confirmed: bool
 
 
+# ============================================================================
+# Idempotency Cache Manager
+# ============================================================================
+
+class CommandIdempotencyManager:
+    """Caches recent command responses to prevent duplicate executions from UI retries/reconnects."""
+
+    def __init__(self, ttl_seconds: float = 60.0):
+        self.ttl = ttl_seconds
+        self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+    def get(self, request_id: Optional[str]) -> Optional[dict[str, Any]]:
+        if not request_id:
+            return None
+        self._clean()
+        if request_id in self._cache:
+            _, response = self._cache[request_id]
+            logger.info(f"[API] Returning cached idempotent response for request_id: {request_id}")
+            return response
+        return None
+
+    def set(self, request_id: Optional[str], response: dict[str, Any]) -> None:
+        if not request_id:
+            return
+        self._clean()
+        self._cache[request_id] = (time.time(), response)
+
+    def _clean(self):
+        now = time.time()
+        expired = [k for k, (t, _) in self._cache.items() if now - t > self.ttl]
+        for k in expired:
+            del self._cache[k]
+
+
+idempotency_manager = CommandIdempotencyManager()
+
+
+# ============================================================================
+# WebSocket Connection Manager
+# ============================================================================
+
 class ConnectionManager:
     """Manages active WebSocket connections to push real-time events to React frontend."""
 
@@ -71,8 +134,26 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
             logger.info("WebSocket client disconnected.")
 
-    async def broadcast(self, message: dict[str, Any]):
-        clean_data = json.loads(SecretRedactionFilter.redact(json.dumps(message)))
+    async def broadcast(
+        self,
+        event_type: str,
+        payload: dict[str, Any],
+        request_id: Optional[str] = None,
+    ):
+        """Broadcast standardized envelope while preserving legacy fields for backwards compatibility."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        event_id = f"evt-{uuid.uuid4().hex[:10]}"
+
+        envelope = {
+            "type": event_type,
+            "event_id": event_id,
+            "timestamp": now_iso,
+            "request_id": request_id,
+            "payload": payload,
+            **payload,  # Legacy top-level fields for existing UI components
+        }
+
+        clean_data = json.loads(SecretRedactionFilter.redact(json.dumps(envelope)))
         for connection in list(self.active_connections):
             try:
                 await connection.send_json(clean_data)
@@ -80,26 +161,160 @@ class ConnectionManager:
                 logger.warning(f"Error broadcasting to WebSocket client: {e}")
                 self.disconnect(connection)
 
+    async def shutdown(self):
+        """Notify all active connections and close cleanly."""
+        await self.broadcast("ENGINE_SHUTDOWN", {"message": "ASTRA Engine is shutting down"})
+        for connection in list(self.active_connections):
+            try:
+                await connection.close(code=1001, reason="Server shutdown")
+            except Exception:
+                pass
+        self.active_connections.clear()
+
 
 ws_manager = ConnectionManager()
 
 
-def create_app(agent=None, voice_manager=None) -> FastAPI:
-    """Factory creating FastAPI application bound to AstraAgent and VoiceManager."""
+# ============================================================================
+# Error Normalization Helper
+# ============================================================================
+
+def normalize_api_error(e: Exception, request_id: Optional[str] = None) -> tuple[int, dict[str, Any]]:
+    """Maps internal exceptions to standardized HTTP status and error envelope."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if isinstance(e, LLMQuotaExhaustedError):
+        code = "LLM_QUOTA_EXHAUSTED"
+        msg = "The configured AI provider has reached its daily quota."
+        status = 429
+    elif isinstance(e, LLMAuthError):
+        code = "LLM_AUTH_FAILED"
+        msg = "AI provider authentication failed. Check your API key."
+        status = 401
+    elif isinstance(e, LLMRateLimitError):
+        code = "RATE_LIMITED"
+        msg = "AI provider rate limit reached. Please wait a moment."
+        status = 429
+    elif isinstance(e, LLMConfigError):
+        code = "INVALID_CONFIGURATION"
+        msg = "AI provider configuration error."
+        status = 500
+    elif isinstance(e, LLMContentPolicyError):
+        code = "CONTENT_POLICY_VIOLATION"
+        msg = "Request was blocked by safety policy filters."
+        status = 400
+    elif isinstance(e, LLMModelNotFoundError):
+        code = "MODEL_NOT_FOUND"
+        msg = "Configured AI model was not found."
+        status = 404
+    elif isinstance(e, (TimeoutError, LLMTimeoutError)):
+        code = "TIMEOUT"
+        msg = "Command execution timed out."
+        status = 504
+    elif isinstance(e, (ConnectionError, LLMNetworkError)):
+        code = "NETWORK_ERROR"
+        msg = "Network connection to upstream provider failed."
+        status = 503
+    elif isinstance(e, PermissionError):
+        code = "PERMISSION_DENIED"
+        msg = "Permission authorization denied."
+        status = 403
+    else:
+        code = "EXECUTION_ERROR"
+        msg = str(e)
+        status = 500
+
+    error_payload = {
+        "success": False,
+        "error": {
+            "code": code,
+            "message": msg,
+            "details": str(e),
+        },
+        "request_id": request_id,
+        "timestamp": now_iso,
+    }
+    return status, error_payload
+
+
+# ============================================================================
+# FastAPI Application Factory
+# ============================================================================
+
+def create_app(
+    agent=None,
+    voice_manager=None,
+    port: int = 8000,
+    host: str = "127.0.0.1",
+    runtime_config: Optional[dict[str, Any]] = None,
+) -> FastAPI:
+    """Factory creating FastAPI application bound to AstraAgent, VoiceManager, and dynamic runtime info."""
     app = FastAPI(title="ASTRA Engine API", version="1.0.0")
 
-    # Configure CORS
+    # Localhost Security: Restrict CORS to local WebEngine and development origins
+    allowed_origins = [
+        f"http://{host}:{port}",
+        f"http://127.0.0.1:{port}",
+        f"http://localhost:{port}",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
+        allow_origin_regex=r"^http://(127\.0\.0\.1|localhost)(:\d+)?$",
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
 
-    # Attach agent and voice_manager instances
+    # Attach agent, voice_manager, and lifecycle state
     app.state.agent = agent
     app.state.voice_manager = voice_manager
+    app.state.port = port
+    app.state.host = host
+    app.state.runtime_config = runtime_config
+    app.state.lifecycle_state = "READY"
+    app.state.ws_manager = ws_manager
+    app.state.idempotency_manager = idempotency_manager
+
+    # -------------------------------
+    # Dynamic Runtime Configuration & Readiness
+    # -------------------------------
+    @app.get("/api/v1/config")
+    @app.get("/api/v1/runtime-config")
+    async def get_runtime_config():
+        """Expose dynamic runtime configuration for frontend discovery without hardcoded ports."""
+        if app.state.runtime_config:
+            return app.state.runtime_config
+        return {
+            "apiBaseUrl": f"http://{host}:{port}/api/v1",
+            "wsUrl": f"ws://{host}:{port}/api/v1/ws",
+            "host": f"{host}:{port}",
+            "port": port,
+            "version": "1.0.0",
+            "environment": "desktop",
+            "capabilities": ["text", "voice", "tools", "vision", "memory", "automations"],
+        }
+
+    @app.get("/api/v1/ready")
+    async def get_readiness():
+        """Readiness probe distinguishing process start from full ASTRA readiness."""
+        is_agent_ready = app.state.agent is not None
+        is_server_ready = app.state.lifecycle_state == "READY"
+        is_healthy = False
+        if is_agent_ready and hasattr(app.state.agent, "health_manager"):
+            is_healthy = app.state.agent.health_manager.is_overall_healthy()
+
+        ready = is_agent_ready and is_server_ready
+        return {
+            "ready": ready,
+            "status": "READY" if ready else "STARTING",
+            "lifecycle_state": app.state.lifecycle_state,
+            "subsystems_ready": is_healthy,
+            "agent_initialized": is_agent_ready,
+        }
 
     # -------------------------------
     # WebSocket Real-Time Endpoint
@@ -112,13 +327,17 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
             if app.state.agent:
                 health = app.state.agent.health_manager.get_all_health()
                 health_data = {k: v.status.value for k, v in health.items()}
-                await websocket.send_json({"type": "HEALTH_CHANGED", "data": health_data})
+                await ws_manager.broadcast("HEALTH_CHANGED", {"data": health_data, "subsystems": health_data})
 
             while True:
                 data = await websocket.receive_json()
-                # Handle client ping / voice triggers over WS if needed
-                if data.get("type") == "PING":
-                    await websocket.send_json({"type": "PONG"})
+                msg_type = (data.get("type") or "").upper()
+                if msg_type == "PING":
+                    await websocket.send_json({
+                        "type": "PONG",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "client_timestamp": data.get("timestamp"),
+                    })
         except WebSocketDisconnect:
             ws_manager.disconnect(websocket)
         except Exception as e:
@@ -152,8 +371,15 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
         if not app.state.agent:
             raise HTTPException(status_code=503, detail="ASTRA Engine agent not initialized")
 
-        logger.info(f"API Command Received: '{req.input}'")
-        await ws_manager.broadcast({"type": "BRAIN_STARTED", "input": req.input})
+        req_id = req.request_id or f"req-{uuid.uuid4().hex[:8]}"
+
+        # Check Idempotency Cache: prevent duplicate execution
+        cached = idempotency_manager.get(req_id)
+        if cached:
+            return cached
+
+        logger.info(f"API Command Received: '{req.input}' (request_id={req_id})")
+        await ws_manager.broadcast("BRAIN_STARTED", {"input": req.input}, request_id=req_id)
 
         try:
             # Run in thread pool to avoid blocking async event loop
@@ -166,11 +392,18 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
 
             tool_used = getattr(tool_result, "tool_name", None) if tool_result else None
             exec_time = getattr(tool_result, "execution_time_sec", 0.0) if tool_result else 0.0
-            status_val = tool_result.status.value if (tool_result and hasattr(tool_result.status, "value")) else "SUCCESS"
+            status_val = (
+                tool_result.status.value
+                if (tool_result and hasattr(tool_result.status, "value"))
+                else "SUCCESS"
+            )
 
+            now_iso = datetime.now(timezone.utc).isoformat()
             response_payload = {
+                "success": True,
                 "type": "BRAIN_COMPLETED",
-                "request_id": req.request_id or f"req-{asyncio.get_event_loop().time()}",
+                "request_id": req_id,
+                "timestamp": now_iso,
                 "status": status_val,
                 "input": req.input,
                 "response": response_text,
@@ -180,21 +413,29 @@ def create_app(agent=None, voice_manager=None) -> FastAPI:
                     "tool_used": tool_used,
                     "execution_time_sec": exec_time,
                 },
+                "data": {
+                    "response": response_text,
+                    "tool_used": tool_used,
+                    "status": status_val,
+                },
             }
 
-            await ws_manager.broadcast(response_payload)
+            # Cache completed response in idempotency cache
+            idempotency_manager.set(req_id, response_payload)
+
+            await ws_manager.broadcast("BRAIN_COMPLETED", response_payload, request_id=req_id)
 
             # Auto TTS if voice manager is active
-            if app.state.voice_manager and app.state.agent.config.voice_enabled:
+            if app.state.voice_manager and getattr(app.state.agent.config, "voice_enabled", True):
                 asyncio.create_task(asyncio.to_thread(app.state.voice_manager.speak, response_text))
 
             return response_payload
 
         except Exception as e:
             logger.error(f"Error processing command via API: {e}")
-            err_payload = {"type": "ERROR_OCCURRED", "message": f"Error executing command: {str(e)}"}
-            await ws_manager.broadcast(err_payload)
-            raise HTTPException(status_code=500, detail=str(e))
+            status_code, err_payload = normalize_api_error(e, request_id=req_id)
+            await ws_manager.broadcast("ERROR_OCCURRED", err_payload, request_id=req_id)
+            return JSONResponse(status_code=status_code, content=err_payload)
 
     # -------------------------------
     # Task Engine (Phase 9)
