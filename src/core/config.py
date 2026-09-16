@@ -88,15 +88,26 @@ class Config:
 
 
 
-        # Voice Subsystem Configuration (Phase 2)
+        # Voice Subsystem Configuration (Phase 2 & Phase V2-04)
         self.voice_enabled = os.getenv("VOICE_ENABLED", "true").lower() in ("true", "1", "yes")
         self.stt_provider = os.getenv("STT_PROVIDER", "speech_recognition").lower()
         self.tts_provider = os.getenv("TTS_PROVIDER", "pyttsx3").lower()
         self.microphone_device = os.getenv("MICROPHONE_DEVICE", "default")
 
+        # Audio stream and VAD parameters (Phase V2-04)
+        self.voice_sample_rate = int(os.getenv("VOICE_SAMPLE_RATE", "16000"))
+        self.voice_channels = int(os.getenv("VOICE_CHANNELS", "1"))
+        self.voice_frame_duration_ms = int(os.getenv("VOICE_FRAME_DURATION", "30"))
+        self.voice_chunk_size = int(os.getenv("VOICE_CHUNK_SIZE", str(int(self.voice_sample_rate * (self.voice_frame_duration_ms / 1000.0)))))
         self.listen_timeout = float(os.getenv("LISTEN_TIMEOUT", "10.0"))
-        self.silence_timeout = float(os.getenv("SILENCE_TIMEOUT", "2.0"))
-        self.minimum_speech_duration = float(os.getenv("MINIMUM_SPEECH_DURATION", "0.5"))
+        self.silence_timeout = float(os.getenv("VOICE_SILENCE_TIMEOUT", os.getenv("SILENCE_TIMEOUT", "1.0")))
+        self.minimum_speech_duration = float(os.getenv("VOICE_MIN_SPEECH_DURATION", os.getenv("MINIMUM_SPEECH_DURATION", "0.3")))
+        self.voice_max_utterance_duration = float(os.getenv("VOICE_MAX_UTTERANCE_DURATION", "15.0"))
+        self.voice_pre_roll = float(os.getenv("VOICE_PRE_ROLL", "0.5"))
+        self.voice_post_roll = float(os.getenv("VOICE_POST_ROLL", "0.3"))
+        self.voice_energy_threshold = float(os.getenv("VOICE_ENERGY_THRESHOLD", "300.0"))
+        self.voice_input_device = os.getenv("VOICE_INPUT_DEVICE", self.microphone_device)
+        self.voice_output_device = os.getenv("VOICE_OUTPUT_DEVICE", "default")
 
         self.tts_rate = int(os.getenv("TTS_RATE", "175"))
         self.tts_volume = float(os.getenv("TTS_VOLUME", "1.0"))

@@ -53,10 +53,12 @@ class HealthManager:
 
     def set_status(self, name: str, status: HealthStatus, message: str = "") -> None:
         """Update health status for a specific subsystem."""
-        if name in self._health:
+        if name not in self._health:
+            self._health[name] = SubsystemHealth(name=name, status=status, message=message or f"Status initialized to {status.value}")
+        else:
             self._health[name].status = status
             self._health[name].message = message or f"Status updated to {status.value}"
-            logger.info(f"HealthManager [{name}]: {status.value} - {self._health[name].message}")
+        logger.info(f"HealthManager [{name}]: {status.value} - {self._health[name].message}")
 
     def get_status(self, name: str) -> SubsystemHealth | None:
         """Get current health status for a subsystem."""

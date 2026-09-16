@@ -1,22 +1,20 @@
 """
 Speech-To-Text (STT) Provider Abstraction and Implementations.
-Allows switching STT engines (SpeechRecognition, Whisper, Mock) via provider factory.
+Allows switching STT engines (SpeechRecognition, Mock) via provider factory
+with zero silent fallback in production and structured metadata results.
 """
 
-import io
 from abc import ABC, abstractmethod
+import io
+import time
 import speech_recognition as sr
-from src.core.exceptions import AstraError
+
 from src.core.logger import get_logger
 from src.voice.audio import calculate_rms, convert_to_wav, normalize_transcript
+from src.voice.errors import STTError, STTTimeoutError, VoiceConfigurationError
+from src.voice.models import AudioSegment, STTResult
 
 logger = get_logger()
-
-
-class STTError(AstraError):
-    """Exception raised when Speech-To-Text transcription fails due to service/network errors."""
-
-    pass
 
 
 class SpeechToTextProvider(ABC):
@@ -24,16 +22,29 @@ class SpeechToTextProvider(ABC):
 
     @abstractmethod
     def transcribe(self, pcm_data: bytes, sample_rate: int = 16000) -> str:
-        """Transcribe raw PCM audio bytes to text string."""
+        """Transcribe raw PCM audio bytes to clean text string."""
         pass
+
+    def transcribe_segment(self, segment: AudioSegment) -> STTResult:
+        """Transcribe an AudioSegment and return rich metadata result."""
+        t0 = time.time()
+        transcript = self.transcribe(segment.pcm_data, sample_rate=segment.sample_rate)
+        duration_s = time.time() - t0
+        return STTResult(
+            transcript=transcript,
+            duration_s=duration_s,
+            provider_name=getattr(self, "provider_name", "generic"),
+        )
 
 
 class SpeechRecognitionSTTProvider(SpeechToTextProvider):
-    """STT Provider implementation using the speech_recognition package."""
+    """STT Provider implementation using the speech_recognition package (Google STT API)."""
 
-    def __init__(self, language: str = "en-US"):
+    def __init__(self, language: str = "en-US", timeout: float = 10.0):
         self.language = language
+        self.timeout = timeout
         self.recognizer = sr.Recognizer()
+        self.provider_name = "speech_recognition"
 
     def transcribe(self, pcm_data: bytes, sample_rate: int = 16000) -> str:
         if not pcm_data:
@@ -42,7 +53,9 @@ class SpeechRecognitionSTTProvider(SpeechToTextProvider):
 
         # Calculate RMS energy level of PCM audio
         rms = calculate_rms(pcm_data)
-        logger.info(f"STT Audio Buffer: {len(pcm_data)} bytes | Sample Rate: {sample_rate}Hz | RMS Energy: {rms:.2f}")
+        logger.info(
+            f"STT Audio Buffer: {len(pcm_data)} bytes | Sample Rate: {sample_rate}Hz | RMS Energy: {rms:.2f}"
+        )
 
         # Filter out background silence / low energy audio before sending to STT API
         if rms < 100.0:
@@ -63,14 +76,27 @@ class SpeechRecognitionSTTProvider(SpeechToTextProvider):
             return cleaned
 
         except sr.UnknownValueError:
-            logger.info("Speech recognition completed: Audio received but speech could not be decoded (UnknownValueError).")
+            logger.info(
+                "Speech recognition completed: Audio received but speech could not be decoded (UnknownValueError)."
+            )
             return ""
         except sr.RequestError as e:
             logger.error(f"STT Engine API request error: {e}")
             raise STTError(f"STT provider service error: {e}")
         except Exception as e:
             logger.error(f"STT Transcription failed: {e}")
-            return ""
+            raise STTError(f"STT transcription error: {e}")
+
+    def transcribe_segment(self, segment: AudioSegment) -> STTResult:
+        t0 = time.time()
+        transcript = self.transcribe(segment.pcm_data, sample_rate=segment.sample_rate)
+        duration_s = time.time() - t0
+        return STTResult(
+            transcript=transcript,
+            language=self.language,
+            duration_s=duration_s,
+            provider_name=self.provider_name,
+        )
 
 
 class MockSTTProvider(SpeechToTextProvider):
@@ -78,13 +104,28 @@ class MockSTTProvider(SpeechToTextProvider):
 
     def __init__(self, mock_transcript: str = "open calculator"):
         self.mock_transcript = mock_transcript
+        self.provider_name = "mock"
+
+    def set_mock_transcript(self, transcript: str) -> None:
+        """Update mock transcript dynamically in tests."""
+        self.mock_transcript = transcript
 
     def transcribe(self, pcm_data: bytes, sample_rate: int = 16000) -> str:
         return normalize_transcript(self.mock_transcript)
 
+    def transcribe_segment(self, segment: AudioSegment) -> STTResult:
+        transcript = normalize_transcript(self.mock_transcript)
+        return STTResult(
+            transcript=transcript,
+            confidence=1.0,
+            language="en-US",
+            duration_s=0.01,
+            provider_name=self.provider_name,
+        )
+
 
 class STTProviderFactory:
-    """Factory for creating configured Speech-To-Text providers."""
+    """Factory for creating configured Speech-To-Text providers with zero silent fallback."""
 
     @staticmethod
     def create(provider_name: str = "speech_recognition", **kwargs) -> SpeechToTextProvider:
@@ -94,5 +135,7 @@ class STTProviderFactory:
         elif normalized == "mock":
             return MockSTTProvider(**kwargs)
         else:
-            logger.warning(f"Unknown STT provider '{provider_name}'. Falling back to SpeechRecognitionSTTProvider.")
-            return SpeechRecognitionSTTProvider(**kwargs)
+            raise VoiceConfigurationError(
+                f"Unknown or unsupported STT provider '{provider_name}'. "
+                "Supported providers are: 'speech_recognition', 'mock'."
+            )

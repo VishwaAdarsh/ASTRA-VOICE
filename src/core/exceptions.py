@@ -270,3 +270,19 @@ class NotificationError(AutomationError):
     """Raised when notification creation or delivery fails."""
 
     pass
+
+
+# Voice Subsystem Exceptions (Phase V2-04)
+from src.voice.errors import (
+    VoiceError,
+    MicrophoneUnavailableError,
+    AudioDeviceError,
+    VADError,
+    STTError,
+    STTTimeoutError,
+    EmptyTranscriptError,
+    TTSError,
+    TTSTimeoutError,
+    VoiceConfigurationError,
+)
+

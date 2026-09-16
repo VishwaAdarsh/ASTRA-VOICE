@@ -608,9 +608,9 @@ def create_app(
             raise HTTPException(status_code=503, detail="VoiceManager not available")
 
         await ws_manager.broadcast({"type": "VOICE_STATE_CHANGED", "state": "listening"})
-        result = await asyncio.to_thread(app.state.voice_manager.listen_and_process, 4.0)
+        response_text, tool_result = await asyncio.to_thread(app.state.voice_manager.listen_and_process, None)
         await ws_manager.broadcast({"type": "VOICE_STATE_CHANGED", "state": "idle"})
-        return {"status": "completed", "transcript": result}
+        return {"status": "completed", "response": response_text}
 
     @app.post("/api/v1/voice/speak")
     async def voice_speak(req: VoiceSpeakRequest):
