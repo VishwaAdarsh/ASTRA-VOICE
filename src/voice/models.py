@@ -1,7 +1,7 @@
 """
 Voice Subsystem Models, Enums, and Data Transfer Objects.
 Defines explicit voice state transitions, VAD signals, configuration containers,
-segmented audio buffers, transcription results, and latency telemetry.
+segmented audio buffers, transcription results, wake-word detection results, and latency telemetry.
 """
 
 from dataclasses import dataclass, field
@@ -14,7 +14,9 @@ class VoiceState(str, Enum):
     """Explicit voice interaction state machine states."""
 
     IDLE = "IDLE"
-    WAKE_WORD_LISTENING = "WAKE_WORD_LISTENING"
+    SLEEPING = "SLEEPING"  # Locally monitoring mic for wake word; 0 cloud calls
+    WAKE_WORD_LISTENING = "WAKE_WORD_LISTENING"  # Backward compatibility alias
+    WAKE_DETECTED = "WAKE_DETECTED"
     LISTENING = "LISTENING"
     SPEECH_DETECTED = "SPEECH_DETECTED"
     CAPTURING = "CAPTURING"
@@ -56,6 +58,32 @@ class AudioConfig:
 
 
 @dataclass
+class WakeDetectionResult:
+    """Detection result emitted by local wake-word detector."""
+
+    detected: bool
+    confidence: float | None = None
+    timestamp: float = field(default_factory=time.time)
+    keyword: str = "hey astra"
+    extracted_command: str | None = None
+    remaining_pcm: bytes = b""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class WakeWordConfig:
+    """Hands-free wake-word detection configuration."""
+
+    enabled: bool = True
+    wake_phrase: str = "hey astra"
+    engine: str = "local_acoustic"  # 'local_acoustic', 'openwakeword', 'mock'
+    threshold: float = 0.6
+    cooldown_seconds: float = 2.0
+    post_wake_buffer_seconds: float = 0.8
+    model_path: str = ""
+
+
+@dataclass
 class VoiceConfig:
     """Voice subsystem master configuration."""
 
@@ -68,6 +96,7 @@ class VoiceConfig:
     voice_language: str = "en-US"
     api_key: str = ""
     audio: AudioConfig = field(default_factory=AudioConfig)
+    wake_word: WakeWordConfig = field(default_factory=WakeWordConfig)
 
 
 @dataclass

@@ -64,3 +64,28 @@ class VoiceConfigurationError(VoiceError):
     """Raised when voice subsystem parameters or provider specifications are invalid."""
 
     pass
+
+
+class WakeWordError(VoiceError):
+    """Base exception for wake-word detection subsystem errors."""
+
+    pass
+
+
+class WakeModelMissingError(WakeWordError):
+    """Raised when the specified wake-word model file cannot be located."""
+
+    pass
+
+
+class WakeModelInvalidError(WakeWordError):
+    """Raised when the wake-word model format or structure is invalid or corrupt."""
+
+    pass
+
+
+class WakeDetectorInitError(WakeWordError):
+    """Raised when initializing the local wake-word detector fails."""
+
+    pass
+

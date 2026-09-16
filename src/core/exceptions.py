@@ -272,7 +272,7 @@ class NotificationError(AutomationError):
     pass
 
 
-# Voice Subsystem Exceptions (Phase V2-04)
+# Voice Subsystem Exceptions (Phase V2-04 & V2-05)
 from src.voice.errors import (
     VoiceError,
     MicrophoneUnavailableError,
@@ -284,5 +284,10 @@ from src.voice.errors import (
     TTSError,
     TTSTimeoutError,
     VoiceConfigurationError,
+    WakeWordError,
+    WakeModelMissingError,
+    WakeModelInvalidError,
+    WakeDetectorInitError,
 )
+
 

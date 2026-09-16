@@ -15,8 +15,10 @@ class HealthStatus(str, Enum):
     """Subsystem operational health state."""
 
     HEALTHY = "HEALTHY"
+    READY = "READY"
     DEGRADED = "DEGRADED"
     UNAVAILABLE = "UNAVAILABLE"
+    DISABLED = "DISABLED"
     UNKNOWN = "UNKNOWN"
 
 

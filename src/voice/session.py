@@ -152,6 +152,7 @@ class VoiceSession:
             # 3. Handle Empty Transcript
             if not transcript or not transcript.strip():
                 logger.info("No speech detected in audio capture buffer. Returning to IDLE.")
+                self.emit_event(VoiceEvent.COMMAND_TIMEOUT)
                 self._set_state(VoiceState.IDLE)
                 return "No speech detected.", None
 

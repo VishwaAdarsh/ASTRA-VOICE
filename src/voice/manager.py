@@ -33,6 +33,7 @@ class VoiceManager:
         tts_provider: TextToSpeechProvider | None = None,
         event_listener: VoiceEventListener | None = None,
         health_manager: HealthManager | None = None,
+        mic: MicrophoneManager | None = None,
     ):
         self.agent = agent
         self.config = config or Config()
@@ -64,7 +65,7 @@ class VoiceManager:
         )
 
         # Initialize hardware & providers via factories
-        self.mic = MicrophoneManager(audio_config=self.voice_config.audio)
+        self._mic = mic or MicrophoneManager(audio_config=self.voice_config.audio)
         self.vad = VoiceActivityDetector(
             energy_threshold=self.voice_config.audio.energy_threshold,
             silence_timeout=self.voice_config.audio.silence_timeout,
@@ -90,20 +91,17 @@ class VoiceManager:
             event_listener=event_listener,
         )
 
-        # Initialize Local Wake Word Subsystem (Phase V2-05 preparation)
+        # Initialize Local Wake Word Subsystem (Phase V2-05)
         try:
-            from src.voice.wake.engine import LocalWakeWordDetector, WakeWordListener
-            self.wake_detector = LocalWakeWordDetector(
-                wake_phrase=self.config.wake_word_phrase,
-                sensitivity=self.config.wake_word_sensitivity,
-            )
+            from src.voice.wake.engine import WakeWordDetectorFactory, WakeWordListener
+            self.wake_detector = WakeWordDetectorFactory.create(self.config)
             self.wake_listener = WakeWordListener(
                 voice_manager=self,
                 detector=self.wake_detector,
                 config=self.config,
             )
         except Exception as e:
-            logger.debug(f"Wake word engine init deferred or optional: {e}")
+            logger.warning(f"Wake-word engine initialization error: {e}")
             self.wake_detector = None
             self.wake_listener = None
 
@@ -112,7 +110,7 @@ class VoiceManager:
 
         logger.info(
             f"VoiceManager initialized (STT={self.voice_config.stt_provider}, "
-            f"TTS={self.voice_config.tts_provider}, SampleRate={self.voice_config.audio.sample_rate}Hz)"
+            f"TTS={self.voice_config.tts_provider}, WakeWord={getattr(self.wake_detector, 'engine_name', 'none')})"
         )
 
     @property
@@ -149,15 +147,56 @@ class VoiceManager:
             "TTS", HealthStatus.HEALTHY, f"Provider: {self.voice_config.tts_provider}"
         )
 
+        # 4. Wake Word Subsystem (Phase V2-05)
+        if not getattr(self.config, "wake_word_enabled", True):
+            self.health_manager.set_status(
+                "WakeWord", HealthStatus.DISABLED, "Wake word intentionally disabled in configuration"
+            )
+        elif self.wake_detector and self.wake_detector.is_ready():
+            engine = getattr(self.wake_detector, "engine_name", "local")
+            phrase = getattr(self.wake_detector, "wake_phrase", "hey astra")
+            self.health_manager.set_status(
+                "WakeWord", HealthStatus.READY, f"Active ({engine}: '{phrase}')"
+            )
+        else:
+            self.health_manager.set_status(
+                "WakeWord", HealthStatus.UNAVAILABLE, "Wake-word detector unavailable or failed initialization"
+            )
+
+    @property
+    def mic(self) -> MicrophoneManager:
+        return self._mic
+
+    @mic.setter
+    def mic(self, value: MicrophoneManager):
+        self._mic = value
+        if hasattr(self, "session") and self.session is not None:
+            self.session.mic = value
+
+    def toggle_wake_word(self, enabled: bool) -> bool:
+        """Dynamically enable or disable hands-free wake word listening."""
+        self.config.wake_word_enabled = enabled
+        if enabled:
+            self.start_wake_word_listener()
+        else:
+            self.stop_wake_word_listener()
+            if self.session.state in (VoiceState.SLEEPING, VoiceState.WAKE_WORD_LISTENING):
+                self.session._set_state(VoiceState.IDLE)
+        self.update_health()
+        logger.info(f"[WAKE] Hands-free wake word enabled status set to: {enabled}")
+        return self.config.wake_word_enabled
+
     def start_wake_word_listener(self) -> None:
         """Start continuous hands-free 'Hey ASTRA' background listener."""
-        if self.config.wake_word_enabled and self.wake_listener:
+        if getattr(self.config, "wake_word_enabled", True) and self.wake_listener:
             self.wake_listener.start()
+        self.update_health()
 
     def stop_wake_word_listener(self) -> None:
         """Stop background wake word listener."""
         if self.wake_listener:
             self.wake_listener.stop()
+        self.update_health()
 
     def listen_and_process(self, duration_seconds: float | None = 3.0):
         """

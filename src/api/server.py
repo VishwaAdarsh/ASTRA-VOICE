@@ -72,6 +72,10 @@ class VoiceSpeakRequest(BaseModel):
     text: str
 
 
+class WakeWordToggleRequest(BaseModel):
+    enabled: bool
+
+
 class SecurityConfirmRequest(BaseModel):
     request_id: str
     confirmed: bool
@@ -136,11 +140,19 @@ class ConnectionManager:
 
     async def broadcast(
         self,
-        event_type: str,
-        payload: dict[str, Any],
+        event_type: str | dict[str, Any],
+        payload: Optional[dict[str, Any]] = None,
         request_id: Optional[str] = None,
     ):
         """Broadcast standardized envelope while preserving legacy fields for backwards compatibility."""
+        if isinstance(event_type, dict):
+            raw = event_type
+            event_type = raw.get("type", "UNKNOWN")
+            payload = {k: v for k, v in raw.items() if k != "type"}
+            request_id = raw.get("request_id", request_id)
+        elif payload is None:
+            payload = {}
+
         now_iso = datetime.now(timezone.utc).isoformat()
         event_id = f"evt-{uuid.uuid4().hex[:10]}"
 
@@ -628,6 +640,31 @@ def create_app(
         app.state.voice_manager.stop_speaking()
         await ws_manager.broadcast({"type": "VOICE_STATE_CHANGED", "state": "idle"})
         return {"status": "stopped"}
+
+    @app.get("/api/v1/voice/wake-word/config")
+    async def get_wake_word_config():
+        if not app.state.voice_manager:
+            raise HTTPException(status_code=503, detail="VoiceManager not available")
+        detector = getattr(app.state.voice_manager, "wake_detector", None)
+        return {
+            "enabled": bool(getattr(app.state.voice_manager.config, "wake_word_enabled", True)),
+            "phrase": getattr(detector, "wake_phrase", "hey astra") if detector else "hey astra",
+            "engine": getattr(detector, "engine_name", "disabled") if detector else "disabled",
+            "ready": detector.is_ready() if detector else False,
+            "sensitivity": getattr(app.state.voice_manager.config, "wake_word_sensitivity", 0.5),
+            "cooldown": getattr(app.state.voice_manager.config, "wake_word_cooldown", 2.0),
+        }
+
+    @app.post("/api/v1/voice/wake-word/toggle")
+    async def toggle_wake_word(req: WakeWordToggleRequest):
+        if not app.state.voice_manager:
+            raise HTTPException(status_code=503, detail="VoiceManager not available")
+        new_state = app.state.voice_manager.toggle_wake_word(req.enabled)
+        await ws_manager.broadcast({
+            "type": "WAKE_WORD_STATE_CHANGED",
+            "enabled": new_state
+        })
+        return {"status": "success", "enabled": new_state}
 
     # -------------------------------
     # Static Files Mounting (React Build)
