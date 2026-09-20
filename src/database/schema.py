@@ -2,28 +2,106 @@
 Database Schema Definitions and Migrations.
 """
 
-CREATE_MEMORIES_TABLE_V1 = """
+CREATE_MEMORIES_TABLE_V2 = """
 CREATE TABLE IF NOT EXISTS memories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memory_id TEXT UNIQUE,
     type TEXT NOT NULL,
     content TEXT NOT NULL,
+    summary TEXT DEFAULT '',
     source TEXT NOT NULL,
+    source_reference TEXT DEFAULT '',
+    created_from_request_id TEXT DEFAULT '',
     importance TEXT DEFAULT 'MEDIUM',
     confidence REAL DEFAULT 1.0,
+    explicitness TEXT DEFAULT 'EXPLICIT',
+    retention_policy TEXT DEFAULT 'LONG',
     status TEXT DEFAULT 'ACTIVE',
+    scope_type TEXT DEFAULT 'GLOBAL',
+    scope_id TEXT DEFAULT '',
     project_id TEXT DEFAULT NULL,
     tags TEXT DEFAULT '',
+    entities TEXT DEFAULT '',
+    privacy_level TEXT DEFAULT 'NORMAL',
+    metadata_json TEXT DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     last_accessed_at TEXT NOT NULL,
+    last_confirmed_at TEXT DEFAULT NULL,
     expires_at TEXT DEFAULT NULL,
-    access_count INTEGER DEFAULT 0
+    access_count INTEGER DEFAULT 0,
+    superseded_by TEXT DEFAULT NULL,
+    revocation_reason TEXT DEFAULT NULL
 );
 """
 
 CREATE_INDEX_TYPE = "CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);"
 CREATE_INDEX_STATUS = "CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);"
 CREATE_INDEX_PROJECT = "CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id);"
+CREATE_INDEX_MEMORY_ID = "CREATE INDEX IF NOT EXISTS idx_memories_memory_id ON memories(memory_id);"
+CREATE_INDEX_SCOPE = "CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope_type, scope_id);"
+CREATE_INDEX_STATUS_TYPE = "CREATE INDEX IF NOT EXISTS idx_memories_status_type ON memories(status, type);"
+CREATE_INDEX_CREATED_AT = "CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at);"
+
+
+def migrate_memories_schema_v2(conn) -> None:
+    """Safely migrate memories table to V2 schema with backward compatibility."""
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(memories);")
+    columns = {row[1] for row in cursor.fetchall()}
+
+    new_columns = [
+        ("memory_id", "TEXT"),
+        ("type", "TEXT DEFAULT 'PROFILE'"),
+        ("summary", "TEXT DEFAULT ''"),
+        ("source_reference", "TEXT DEFAULT ''"),
+        ("created_from_request_id", "TEXT DEFAULT ''"),
+        ("importance", "TEXT DEFAULT 'MEDIUM'"),
+        ("confidence", "REAL DEFAULT 1.0"),
+        ("explicitness", "TEXT DEFAULT 'EXPLICIT'"),
+        ("retention_policy", "TEXT DEFAULT 'LONG'"),
+        ("status", "TEXT DEFAULT 'ACTIVE'"),
+        ("scope_type", "TEXT DEFAULT 'GLOBAL'"),
+        ("scope_id", "TEXT DEFAULT ''"),
+        ("project_id", "TEXT DEFAULT NULL"),
+        ("tags", "TEXT DEFAULT ''"),
+        ("entities", "TEXT DEFAULT ''"),
+        ("privacy_level", "TEXT DEFAULT 'NORMAL'"),
+        ("metadata_json", "TEXT DEFAULT '{}'"),
+        ("last_accessed_at", "TEXT DEFAULT ''"),
+        ("last_confirmed_at", "TEXT DEFAULT NULL"),
+        ("expires_at", "TEXT DEFAULT NULL"),
+        ("superseded_by", "TEXT DEFAULT NULL"),
+        ("revocation_reason", "TEXT DEFAULT NULL"),
+    ]
+
+    for col_name, col_def in new_columns:
+        if col_name not in columns:
+            cursor.execute(f"ALTER TABLE memories ADD COLUMN {col_name} {col_def};")
+
+    # If legacy table had 'memory_type', copy it to 'type'
+    if "memory_type" in columns:
+        cursor.execute("UPDATE memories SET type = memory_type WHERE type IS NULL OR type = '' OR type = 'PROFILE';")
+
+    # If legacy table had 'last_accessed', copy it to 'last_accessed_at'
+    if "last_accessed" in columns:
+        cursor.execute("UPDATE memories SET last_accessed_at = last_accessed WHERE last_accessed_at IS NULL OR last_accessed_at = '';")
+
+    # Backfill memory_id for existing rows that do not have one
+    cursor.execute("SELECT id FROM memories WHERE memory_id IS NULL OR memory_id = '';")
+    missing_ids = cursor.fetchall()
+    for (row_id,) in missing_ids:
+        cursor.execute(
+            "UPDATE memories SET memory_id = ? WHERE id = ?;",
+            (f"mem_legacy_{row_id}", row_id),
+        )
+
+    # Create V2 indexes
+    conn.execute(CREATE_INDEX_MEMORY_ID)
+    conn.execute(CREATE_INDEX_SCOPE)
+    conn.execute(CREATE_INDEX_STATUS_TYPE)
+    conn.execute(CREATE_INDEX_CREATED_AT)
+
 
 # Task Engine Schema (Phase 9)
 CREATE_TASKS_TABLE_V3 = """
@@ -137,10 +215,11 @@ CREATE_INDEX_RUNS_AUTOMATION_ID = "CREATE INDEX IF NOT EXISTS idx_runs_automatio
 def initialize_schema(conn) -> None:
     """Execute schema creation scripts on SQLite connection."""
     with conn:
-        conn.execute(CREATE_MEMORIES_TABLE_V1)
+        conn.execute(CREATE_MEMORIES_TABLE_V2)
         conn.execute(CREATE_INDEX_TYPE)
         conn.execute(CREATE_INDEX_STATUS)
         conn.execute(CREATE_INDEX_PROJECT)
+        migrate_memories_schema_v2(conn)
 
         # Phase 9 Schema
         conn.execute(CREATE_TASKS_TABLE_V3)

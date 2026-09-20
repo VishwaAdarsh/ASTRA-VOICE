@@ -1,0 +1,16 @@
+{
+  "apiBaseUrl": "http://127.0.0.1:8000/api/v1",
+  "wsUrl": "ws://127.0.0.1:8000/api/v1/ws",
+  "host": "127.0.0.1:8000",
+  "port": 8000,
+  "version": "1.0.0",
+  "environment": "desktop",
+  "capabilities": [
+    "text",
+    "voice",
+    "tools",
+    "vision",
+    "memory",
+    "automations"
+  ]
+}

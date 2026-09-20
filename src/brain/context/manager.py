@@ -3,6 +3,7 @@ Context Manager Subsystem.
 Orchestrates conversation history, recent tool results, and LLM context payload formatting.
 """
 
+from typing import Any
 from src.brain.context.conversation import ConversationTurn, Message, Session
 from src.brain.context.window import ContextWindow
 from src.core.logger import get_logger
@@ -13,9 +14,20 @@ logger = get_logger()
 class ContextManager:
     """Manages conversational state and context payload construction."""
 
-    def __init__(self, max_tokens: int = 2048):
+    def __init__(self, max_tokens: int = 2048, desktop_context_engine: Any = None):
         self.session = Session()
         self.window = ContextWindow(max_tokens=max_tokens)
+        self.desktop_context_engine = desktop_context_engine
+
+    def get_formatted_desktop_context(self, user_command: str) -> str:
+        """Query desktop context engine for sanitized, task-relevant desktop context."""
+        if self.desktop_context_engine:
+            try:
+                return self.desktop_context_engine.get_relevant_context(user_command)
+            except Exception as e:
+                logger.debug(f"Error getting desktop context: {e}")
+                return ""
+        return ""
 
     def add_user_message(self, text: str) -> Message:
         """Add user input message to active context session."""

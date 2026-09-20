@@ -32,21 +32,43 @@ class ForgetMemoryTool(BaseTool):
     def permission_level(self) -> PermissionLevel:
         return PermissionLevel.SAFE
 
+    parameters_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "memory_id": {
+                "type": ["string", "integer"],
+                "description": "Unique identifier of the memory item to delete (string 'mem_...' or integer ID)",
+            },
+            "target": {
+                "type": "string",
+                "description": "Content pattern or keyword to search and delete matching memories",
+            },
+            "reason": {
+                "type": "string",
+                "description": "Optional reason for forgetting/revoking this memory",
+            },
+        },
+    }
+
     def validate(self, parameters: dict[str, Any]) -> bool:
-        return ("target" in parameters and isinstance(parameters["target"], str)) or ("memory_id" in parameters and isinstance(parameters["memory_id"], int))
+        return (
+            ("target" in parameters and isinstance(parameters["target"], str) and len(parameters["target"].strip()) > 0)
+            or ("memory_id" in parameters and (isinstance(parameters["memory_id"], (int, str))))
+        )
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         memory_id = parameters.get("memory_id")
         target = parameters.get("target", "").strip()
+        reason = parameters.get("reason", "User requested deletion")
 
         try:
-            if memory_id and isinstance(memory_id, int):
-                success = self.memory_manager.forget(memory_id)
+            if memory_id is not None:
+                success = self.memory_manager.forget(memory_id, reason=reason)
                 if success:
                     return ToolResult(
                         status=ExecutionStatus.SUCCESS,
                         message=f"Memory #{memory_id} removed.",
-                        data={"id": memory_id},
+                        data={"id": memory_id, "memory_id": str(memory_id)},
                     )
                 return ToolResult(
                     status=ExecutionStatus.NOT_FOUND,

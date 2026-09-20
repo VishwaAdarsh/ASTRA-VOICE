@@ -32,20 +32,44 @@ class RetrieveMemoryTool(BaseTool):
     def permission_level(self) -> PermissionLevel:
         return PermissionLevel.SAFE
 
+    parameters_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Natural language query or keywords to search relevant memories",
+            },
+            "project_id": {
+                "type": "string",
+                "description": "Optional project identifier to filter project-scoped memories",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of relevant memories to retrieve (default 5)",
+            },
+        },
+        "required": ["query"],
+    }
+
     def validate(self, parameters: dict[str, Any]) -> bool:
         return "query" in parameters and isinstance(parameters["query"], str)
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         query = str(parameters["query"]).strip()
+        project_id = parameters.get("project_id")
+        limit = parameters.get("limit", 5)
 
         try:
-            results = self.memory_manager.retrieve(query=query)
+            results = self.memory_manager.retrieve(query=query, project_id=project_id, limit=limit)
             data_memories = [
                 {
                     "id": r.memory.id,
+                    "memory_id": r.memory.memory_id,
                     "content": r.memory.content,
                     "type": r.memory.type.value,
                     "score": r.relevance_score,
+                    "project_id": r.memory.project_id,
+                    "scope_type": r.memory.scope_type.value,
                 }
                 for r in results
             ]

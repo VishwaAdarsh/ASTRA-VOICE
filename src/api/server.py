@@ -34,6 +34,15 @@ from src.brain.llm.errors import (
     LLMTimeoutError,
 )
 from src.core.config import Config
+from src.core.events import (
+    ASTRAEvent,
+    AstraEventType,
+    EventBus,
+    EventPriority,
+    HealthAdapter,
+    LoggingAdapter,
+    UIEventAdapter,
+)
 from src.core.logger import get_logger
 from src.memory.models import MemoryType
 from src.security.auditor import SecretRedactionFilter
@@ -73,6 +82,14 @@ class VoiceSpeakRequest(BaseModel):
 
 
 class WakeWordToggleRequest(BaseModel):
+    enabled: bool
+
+
+class BargeInToggleRequest(BaseModel):
+    enabled: bool
+
+
+class ContextToggleRequest(BaseModel):
     enabled: bool
 
 
@@ -258,6 +275,7 @@ def create_app(
     port: int = 8000,
     host: str = "127.0.0.1",
     runtime_config: Optional[dict[str, Any]] = None,
+    event_bus: Optional[EventBus] = None,
 ) -> FastAPI:
     """Factory creating FastAPI application bound to AstraAgent, VoiceManager, and dynamic runtime info."""
     app = FastAPI(title="ASTRA Engine API", version="1.0.0")
@@ -281,6 +299,15 @@ def create_app(
         allow_headers=["*"],
     )
 
+    # Wire Event Bus and Subsystem Adapters
+    eb = event_bus or (getattr(agent, "event_bus", None) if agent else None) or EventBus()
+    if agent and not getattr(agent, "event_bus", None):
+        agent.event_bus = eb
+    if voice_manager and not getattr(voice_manager, "event_bus", None):
+        voice_manager.event_bus = eb
+        if hasattr(voice_manager, "session"):
+            voice_manager.session.event_bus = eb
+
     # Attach agent, voice_manager, and lifecycle state
     app.state.agent = agent
     app.state.voice_manager = voice_manager
@@ -290,6 +317,11 @@ def create_app(
     app.state.lifecycle_state = "READY"
     app.state.ws_manager = ws_manager
     app.state.idempotency_manager = idempotency_manager
+    app.state.event_bus = eb
+    app.state.ui_adapter = UIEventAdapter(ws_manager=ws_manager, event_bus=eb)
+    if agent and hasattr(agent, "health_manager"):
+        app.state.health_adapter = HealthAdapter(health_manager=agent.health_manager, event_bus=eb)
+    app.state.logging_adapter = LoggingAdapter(event_bus=eb)
 
     # -------------------------------
     # Dynamic Runtime Configuration & Readiness
@@ -665,6 +697,63 @@ def create_app(
             "enabled": new_state
         })
         return {"status": "success", "enabled": new_state}
+
+    @app.get("/api/v1/voice/barge-in/config")
+    async def get_barge_in_config():
+        if not app.state.voice_manager:
+            raise HTTPException(status_code=503, detail="VoiceManager not available")
+        cfg = app.state.voice_manager.config
+        return {
+            "enabled": bool(getattr(cfg, "barge_in_enabled", True)),
+            "energy_threshold": float(getattr(cfg, "barge_in_energy_threshold", 650.0)),
+            "min_speech_duration": float(getattr(cfg, "barge_in_min_speech_duration", 0.25)),
+            "cooldown": float(getattr(cfg, "barge_in_cooldown", 1.5)),
+            "grace_period": float(getattr(cfg, "barge_in_grace_period", 0.2)),
+        }
+
+    @app.post("/api/v1/voice/barge-in/toggle")
+    async def toggle_barge_in(req: BargeInToggleRequest):
+        if not app.state.voice_manager:
+            raise HTTPException(status_code=503, detail="VoiceManager not available")
+        new_state = app.state.voice_manager.toggle_barge_in(req.enabled)
+        await ws_manager.broadcast({
+            "type": "BARGE_IN_STATE_CHANGED",
+            "enabled": new_state
+        })
+        return {"status": "success", "enabled": new_state}
+
+    # -------------------------------
+    # Desktop Context Engine (Phase V2-08)
+    # -------------------------------
+    @app.get("/api/v1/context/current")
+    async def get_current_desktop_context(include_clipboard: bool = False, include_screen: bool = False):
+        if not app.state.agent or not getattr(app.state.agent, "desktop_context_engine", None):
+            raise HTTPException(status_code=503, detail="DesktopContextEngine not available")
+        snapshot = app.state.agent.desktop_context_engine.get_current_context(
+            force_refresh=True,
+            include_clipboard=include_clipboard,
+            include_screen=include_screen,
+        )
+        return snapshot.to_dict()
+
+    @app.get("/api/v1/context/active-window")
+    async def get_active_window_context():
+        if not app.state.agent or not getattr(app.state.agent, "desktop_context_engine", None):
+            raise HTTPException(status_code=503, detail="DesktopContextEngine not available")
+        snapshot = app.state.agent.desktop_context_engine.get_current_context(force_refresh=False)
+        return {
+            "active_window": snapshot.active_window.to_dict() if snapshot.active_window else None,
+            "active_application": snapshot.active_application.to_dict() if snapshot.active_application else None,
+            "active_file": snapshot.active_file.to_dict() if snapshot.active_file else None,
+            "current_directory": snapshot.current_directory.to_dict() if snapshot.current_directory else None,
+        }
+
+    @app.post("/api/v1/context/toggle")
+    async def toggle_desktop_context(req: ContextToggleRequest):
+        if not app.state.agent or not getattr(app.state.agent, "desktop_context_engine", None):
+            raise HTTPException(status_code=503, detail="DesktopContextEngine not available")
+        app.state.agent.desktop_context_engine.enabled = req.enabled
+        return {"status": "success", "enabled": req.enabled}
 
     # -------------------------------
     # Static Files Mounting (React Build)

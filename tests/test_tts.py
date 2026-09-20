@@ -2,6 +2,7 @@
 Unit tests for Text-To-Speech (TTS) Provider Subsystem.
 """
 
+from unittest.mock import MagicMock, patch
 from src.voice.tts import MockTTSProvider, Pyttsx3TTSProvider, TTSProviderFactory
 
 
@@ -17,5 +18,7 @@ def test_tts_factory_create():
     mock_p = TTSProviderFactory.create("mock")
     assert isinstance(mock_p, MockTTSProvider)
 
-    pyttsx3_p = TTSProviderFactory.create("pyttsx3")
-    assert isinstance(pyttsx3_p, Pyttsx3TTSProvider)
+    with patch("src.voice.tts.pyttsx3.init", return_value=MagicMock()):
+        pyttsx3_p = TTSProviderFactory.create("pyttsx3")
+        assert isinstance(pyttsx3_p, Pyttsx3TTSProvider)
+        pyttsx3_p.shutdown()

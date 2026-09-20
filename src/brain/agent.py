@@ -6,6 +6,7 @@ Coordinates LLM Reasoning, Context Management, Task Planning, Permission Enforce
 import time
 from typing import Any
 
+from src.brain.context.engine import DesktopContextEngine
 from src.brain.context.manager import ContextManager
 from src.brain.intent import IntentRecognizer, RuleBasedIntentRecognizer
 from src.brain.llm.client import LLMClient
@@ -19,6 +20,8 @@ from src.brain.prompts.system import ASTRA_SYSTEM_PROMPT_V1
 from src.brain.prompts.tool_selection import generate_tool_schemas
 from src.brain.router import IntentRouter
 from src.core.config import Config
+from src.core.events.bus import EventBus
+from src.core.events.models import ASTRAEvent, AstraEventType, EventPriority
 from src.core.exceptions import AstraError
 from src.core.logger import get_logger
 from src.execution.executor import ToolExecutor
@@ -48,6 +51,7 @@ from src.security.injection import PromptInjectionDefense
 from src.tools.filesystem import OpenFolderTool
 from src.tools.registry import ToolRegistry
 from src.task.manager import TaskManager
+from src.memory.context import MemoryContextBuilder
 from src.memory.manager import MemoryManager
 from src.tools.memory import (
     ForgetMemoryTool,
@@ -88,8 +92,11 @@ class AstraAgent:
         permission_manager: PermissionManager | None = None,
         context_manager: ContextManager | None = None,
         executor: ToolExecutor | None = None,
+        desktop_context_engine: DesktopContextEngine | None = None,
+        event_bus: EventBus | None = None,
     ):
         self.config = config or Config()
+        self.event_bus = event_bus
         self.fallback_recognizer = intent_recognizer or RuleBasedIntentRecognizer()
         self.router = IntentRouter()
         self.registry = tool_registry or ToolRegistry()
@@ -102,7 +109,19 @@ class AstraAgent:
         self.injection_defense = PromptInjectionDefense(config=self.config, auditor=self.security_auditor)
         self.context_manager = context_manager or ContextManager()
         self.memory_manager = MemoryManager(config=self.config)
+        self.memory_context_builder = MemoryContextBuilder(
+            config=self.config,
+            memory_service=self.memory_manager.service,
+        )
         self.vision_manager = VisionManager(config=self.config)
+        self.desktop_context_engine = desktop_context_engine or DesktopContextEngine(
+            config=self.config,
+            vision_manager=self.vision_manager,
+            injection_defense=self.injection_defense,
+        )
+        if hasattr(self.context_manager, "desktop_context_engine"):
+            self.context_manager.desktop_context_engine = self.desktop_context_engine
+
         self.task_manager = TaskManager(config=self.config, registry=self.registry)
         self.automation_manager = AutomationManager(config=self.config, registry=self.registry, task_manager=self.task_manager)
         self.notification_manager = self.automation_manager.notification_manager
@@ -191,19 +210,31 @@ class AstraAgent:
 
 
 
-    def process_command(self, raw_input: str | Command) -> tuple[str, ToolResult]:
+    def process_command(self, raw_input: str | Command, request_id: str | None = None) -> tuple[str, ToolResult]:
         """Process a user command through the Controlled Multi-Step Agent Orchestration Loop."""
         if isinstance(raw_input, Command):
             command = raw_input
             raw_input_text = raw_input.raw_text
+            req_id = request_id or getattr(command, "request_id", None) or getattr(command, "id", None)
         else:
             raw_input_text = str(raw_input)
+            req_id = request_id
             command = Command(
                 raw_text=raw_input_text,
                 normalized_text=raw_input_text.strip().lower(),
             )
         raw_input = raw_input_text
-        logger.info(f"AGENT_REQUEST_STARTED: '{raw_input}'")
+        logger.info(f"AGENT_REQUEST_STARTED: '{raw_input}' (req_id={req_id})")
+
+        if self.event_bus:
+            self.event_bus.publish(
+                ASTRAEvent(
+                    event_type=AstraEventType.AGENT_STARTED,
+                    source="agent",
+                    request_id=req_id,
+                    payload={"input": raw_input_text},
+                )
+            )
 
         # Add user message to Context Manager
         self.context_manager.add_user_message(raw_input)
@@ -229,13 +260,51 @@ class AstraAgent:
                         message="Request exceeded execution timeout limit.",
                         error="Execution timeout",
                     )
+                    if self.event_bus:
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.AGENT_FAILED,
+                                source="agent",
+                                request_id=req_id,
+                                priority=EventPriority.HIGH,
+                                payload={"error": "Execution timeout"},
+                            )
+                        )
                     return "I couldn't complete the task within the allowed time limit.", timeout_res
 
                 iteration += 1
                 logger.info(f"AGENT_ITERATION: {iteration}/{max_iterations}")
 
+                if self.event_bus:
+                    self.event_bus.publish(
+                        ASTRAEvent(
+                            event_type=AstraEventType.AGENT_THINKING,
+                            source="agent",
+                            request_id=req_id,
+                            payload={"iteration": iteration, "max_iterations": max_iterations},
+                        )
+                    )
+
                 # Build context-aware prompt with prior step results
                 formatted_context = self.context_manager.get_formatted_context_prompt()
+                desktop_context_str = self.desktop_context_engine.get_relevant_context(raw_input)
+                desktop_section = f"\n\nDesktop Context:\n{desktop_context_str}" if desktop_context_str else ""
+
+                # Memory V2 Context Injection (Context-Aware, Privacy-Safe, Injection-Defended)
+                memory_section = ""
+                if getattr(self.config, "memory_enabled", True):
+                    project_id = None
+                    if hasattr(self.desktop_context_engine, "_cached_snapshot") and self.desktop_context_engine._cached_snapshot:
+                        dir_ctx = getattr(self.desktop_context_engine._cached_snapshot, "directory_context", None)
+                        if dir_ctx and getattr(dir_ctx, "current_directory", None):
+                            project_id = dir_ctx.current_directory.split("\\")[-1]
+
+                    mem_context_str = self.memory_context_builder.build_context(
+                        query=raw_input,
+                        project_id=project_id,
+                    )
+                    if mem_context_str:
+                        memory_section = f"\n\n{mem_context_str}"
 
                 steps_summary_lines = []
                 for idx, step_info in enumerate(tool_history):
@@ -246,7 +315,7 @@ class AstraAgent:
                 steps_context = "\n".join(steps_summary_lines) if steps_summary_lines else "None (Initial Step)"
 
                 full_prompt = (
-                    f"Context History:\n{formatted_context}\n\n"
+                    f"Context History:\n{formatted_context}{desktop_section}{memory_section}\n\n"
                     f"User Command:\n{raw_input}\n\n"
                     f"Execution Steps Taken So Far:\n{steps_context}\n\n"
                     f"Instructions: If the user request has been fully satisfied, return a natural conversational response. "
@@ -271,6 +340,15 @@ class AstraAgent:
                     if getattr(self.config, "performance_logging", True):
                         logger.info(f"[PERF] Agent Completed (Iteration {iteration}): LLM={llm_latency:.2f}s | Total Agent={total_agent_time:.2f}s")
                     logger.info(f"AGENT_COMPLETED: Final response generated in iteration {iteration}")
+                    if self.event_bus:
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.AGENT_COMPLETED,
+                                source="agent",
+                                request_id=req_id,
+                                payload={"response": response_text, "status": "SUCCESS"},
+                            )
+                        )
                     return response_text, final_result
 
                 # Case 2: Clarification Request
@@ -278,6 +356,15 @@ class AstraAgent:
                     response_text = decision.message or "Could you please clarify your request?"
                     final_result = ToolResult(status=ExecutionStatus.SUCCESS, message=response_text)
                     self.context_manager.record_turn_result(response_text)
+                    if self.event_bus:
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.AGENT_CLARIFICATION_REQUESTED,
+                                source="agent",
+                                request_id=req_id,
+                                payload={"message": response_text},
+                            )
+                        )
                     return response_text, final_result
 
                 # Case 3: Structured Tool Call
@@ -295,9 +382,29 @@ class AstraAgent:
                             message="Repetitive tool execution loop detected.",
                             error="Loop limit exceeded",
                         )
+                        if self.event_bus:
+                            self.event_bus.publish(
+                                ASTRAEvent(
+                                    event_type=AstraEventType.AGENT_FAILED,
+                                    source="agent",
+                                    request_id=req_id,
+                                    priority=EventPriority.HIGH,
+                                    payload={"error": "Repetitive tool execution loop detected."},
+                                )
+                            )
                         return f"I stopped because the action '{tool_name}' was repeating without progress.", loop_res
 
                     seen_tool_signatures.append(call_sig)
+
+                    if self.event_bus:
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.TOOL_STARTED,
+                                source="tool",
+                                request_id=req_id,
+                                payload={"tool": tool_name, "parameters": arguments},
+                            )
+                        )
 
                     # Execute tool through authoritative security and verification pipeline
                     t_tool_start = time.time()
@@ -309,6 +416,23 @@ class AstraAgent:
                     t_tool_end = time.time()
                     tool_latency = t_tool_end - t_tool_start
                     last_tool_result = tool_result
+
+                    if self.event_bus:
+                        is_success = tool_result.status == ExecutionStatus.SUCCESS
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.TOOL_COMPLETED if is_success else AstraEventType.TOOL_FAILED,
+                                source="tool",
+                                request_id=req_id,
+                                priority=EventPriority.NORMAL if is_success else EventPriority.HIGH,
+                                payload={
+                                    "tool": tool_name,
+                                    "status": tool_result.status.value,
+                                    "message": tool_result.message,
+                                    "error": tool_result.error,
+                                },
+                            )
+                        )
 
                     if getattr(self.config, "performance_logging", True):
                         logger.info(
@@ -341,9 +465,16 @@ class AstraAgent:
                         total_agent_time = time.time() - start_time
                         if getattr(self.config, "performance_logging", True):
                             logger.info(f"[PERF] Simple Fast-Path Completed: Total Agent={total_agent_time:.2f}s")
+                        if self.event_bus:
+                            self.event_bus.publish(
+                                ASTRAEvent(
+                                    event_type=AstraEventType.AGENT_COMPLETED,
+                                    source="agent",
+                                    request_id=req_id,
+                                    payload={"response": response_text, "status": "SUCCESS"},
+                                )
+                            )
                         return response_text, tool_result
-
-
 
                 elif decision.decision_type == DecisionType.PLAN and decision.steps:
                     # Multi-step plan execution
@@ -352,23 +483,58 @@ class AstraAgent:
                     is_valid, err = self.plan_validator.validate(plan)
                     if not is_valid:
                         logger.warning(f"Plan validation failed: {err}")
-                        return self._fallback_execution(command)
+                        return self._fallback_execution(command, request_id=req_id)
 
                     last_result = None
                     for step in plan.steps:
                         req = ToolRequest(tool_name=step.tool_name, parameters=step.arguments)
+                        if self.event_bus:
+                            self.event_bus.publish(
+                                ASTRAEvent(
+                                    event_type=AstraEventType.TOOL_STARTED,
+                                    source="tool",
+                                    request_id=req_id,
+                                    payload={"tool": step.tool_name, "parameters": step.arguments},
+                                )
+                            )
                         last_result = self.executor.execute(req)
+                        if self.event_bus:
+                            is_success = last_result.status == ExecutionStatus.SUCCESS
+                            self.event_bus.publish(
+                                ASTRAEvent(
+                                    event_type=AstraEventType.TOOL_COMPLETED if is_success else AstraEventType.TOOL_FAILED,
+                                    source="tool",
+                                    request_id=req_id,
+                                    priority=EventPriority.NORMAL if is_success else EventPriority.HIGH,
+                                    payload={
+                                        "tool": step.tool_name,
+                                        "status": last_result.status.value,
+                                        "message": last_result.message,
+                                        "error": last_result.error,
+                                    },
+                                )
+                            )
                         if last_result.status != ExecutionStatus.SUCCESS:
                             break
 
                     response_text = self._format_response(last_result) if last_result else "Plan completed."
-                    return response_text, last_result or ToolResult(status=ExecutionStatus.SUCCESS, message="Plan executed.")
+                    final_plan_res = last_result or ToolResult(status=ExecutionStatus.SUCCESS, message="Plan executed.")
+                    if self.event_bus:
+                        self.event_bus.publish(
+                            ASTRAEvent(
+                                event_type=AstraEventType.AGENT_COMPLETED if final_plan_res.status == ExecutionStatus.SUCCESS else AstraEventType.AGENT_FAILED,
+                                source="agent",
+                                request_id=req_id,
+                                payload={"response": response_text, "status": final_plan_res.status.value},
+                            )
+                        )
+                    return response_text, final_plan_res
 
                 else:
                     logger.info(
                         f"LLM returned fallback/error decision (type={decision.decision_type}). Invoking fallback engine."
                     )
-                    return self._fallback_execution(command, error_decision=decision)
+                    return self._fallback_execution(command, error_decision=decision, request_id=req_id)
 
             # Reached max iterations limit
             logger.warning(f"AGENT_MAX_ITERATIONS_REACHED: {max_iterations}")
@@ -377,25 +543,46 @@ class AstraAgent:
                 message="I reached the maximum number of steps allowed for this task.",
                 error="Max iterations limit reached",
             )
+            if self.event_bus:
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=AstraEventType.AGENT_FAILED,
+                        source="agent",
+                        request_id=req_id,
+                        priority=EventPriority.HIGH,
+                        payload={"error": "Max iterations limit reached"},
+                    )
+                )
             return "I reached the maximum number of steps allowed for this task.", max_iter_res
 
         except Exception as e:
             logger.error(f"Error during agent orchestration: {e}. Switching to fallback engine.", exc_info=True)
-            return self._fallback_execution(command)
+            return self._fallback_execution(command, request_id=req_id)
 
     def _fallback_execution(
         self,
         command: Command,
         error_decision: LLMDecision | None = None,
+        request_id: str | None = None,
     ) -> tuple[str, ToolResult]:
         """Deterministic Rule-Based Fallback Engine."""
-        logger.info(f"FALLBACK_ENGINE: Processing command '{command.raw_text}'")
+        req_id = request_id or getattr(command, "request_id", None) or getattr(command, "id", None)
+        logger.info(f"FALLBACK_ENGINE: Processing command '{command.raw_text}' (req_id={req_id})")
         intent = self.fallback_recognizer.recognize(command)
 
         if intent.intent_type == IntentType.CONVERSATION:
             resp = "Hello! I am ASTRA, your desktop personal AI assistant. How can I help you today?"
             result = ToolResult(status=ExecutionStatus.SUCCESS, message=resp)
             self.context_manager.record_turn_result(resp)
+            if self.event_bus:
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=AstraEventType.AGENT_COMPLETED,
+                        source="agent",
+                        request_id=req_id,
+                        payload={"response": resp, "status": "SUCCESS"},
+                    )
+                )
             return resp, result
 
         if intent.intent_type == IntentType.STOP:
@@ -404,6 +591,15 @@ class AstraAgent:
             resp = "Stopped active operations."
             result = ToolResult(status=ExecutionStatus.SUCCESS, message=resp)
             self.context_manager.record_turn_result(resp)
+            if self.event_bus:
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=AstraEventType.AGENT_COMPLETED,
+                        source="agent",
+                        request_id=req_id,
+                        payload={"response": resp, "status": "SUCCESS"},
+                    )
+                )
             return resp, result
 
         if intent.intent_type == IntentType.UNKNOWN:
@@ -415,6 +611,16 @@ class AstraAgent:
                     message=err_msg,
                     error=error_decision.reason or "LLM provider error",
                 )
+                if self.event_bus:
+                    self.event_bus.publish(
+                        ASTRAEvent(
+                            event_type=AstraEventType.AGENT_FAILED,
+                            source="agent",
+                            request_id=req_id,
+                            priority=EventPriority.HIGH,
+                            payload={"error": result.error},
+                        )
+                    )
                 return err_msg, result
 
             result = ToolResult(
@@ -422,12 +628,56 @@ class AstraAgent:
                 message="I don't understand that command yet.",
                 error="Unknown intent",
             )
+            if self.event_bus:
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=AstraEventType.AGENT_FAILED,
+                        source="agent",
+                        request_id=req_id,
+                        priority=EventPriority.NORMAL,
+                        payload={"error": "Unknown intent"},
+                    )
+                )
             return "I don't understand that command yet.", result
 
         tool_request = self.router.route(intent)
+        if self.event_bus:
+            self.event_bus.publish(
+                ASTRAEvent(
+                    event_type=AstraEventType.TOOL_STARTED,
+                    source="tool",
+                    request_id=req_id,
+                    payload={"tool": tool_request.tool_name, "parameters": tool_request.parameters},
+                )
+            )
         tool_result = self.executor.execute(tool_request)
+        if self.event_bus:
+            is_success = tool_result.status == ExecutionStatus.SUCCESS
+            self.event_bus.publish(
+                ASTRAEvent(
+                    event_type=AstraEventType.TOOL_COMPLETED if is_success else AstraEventType.TOOL_FAILED,
+                    source="tool",
+                    request_id=req_id,
+                    priority=EventPriority.NORMAL if is_success else EventPriority.HIGH,
+                    payload={
+                        "tool": tool_request.tool_name,
+                        "status": tool_result.status.value,
+                        "message": tool_result.message,
+                        "error": tool_result.error,
+                    },
+                )
+            )
         response_text = self._format_response(tool_result)
         self.context_manager.record_turn_result(response_text, tool_request.tool_name, tool_result.data)
+        if self.event_bus:
+            self.event_bus.publish(
+                ASTRAEvent(
+                    event_type=AstraEventType.AGENT_COMPLETED if tool_result.status == ExecutionStatus.SUCCESS else AstraEventType.AGENT_FAILED,
+                    source="agent",
+                    request_id=req_id,
+                    payload={"response": response_text, "status": tool_result.status.value},
+                )
+            )
         return response_text, tool_result
 
     def _format_response(self, result: ToolResult) -> str:

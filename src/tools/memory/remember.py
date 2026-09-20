@@ -33,20 +33,40 @@ class RememberTool(BaseTool):
     def permission_level(self) -> PermissionLevel:
         return PermissionLevel.SAFE
 
+    parameters_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "content": {"type": "string", "description": "The information or preference to remember"},
+            "memory_type": {
+                "type": "string",
+                "enum": ["PREFERENCE", "PROFILE", "PROJECT", "EPISODIC", "PROCEDURAL", "WORKING", "USER_PREFERENCE", "USER_FACT"],
+                "description": "Category of memory item",
+            },
+            "project_id": {"type": "string", "description": "Optional project identifier"},
+            "importance": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"], "description": "Importance weighting"},
+        },
+        "required": ["content"],
+    }
+
     def validate(self, parameters: dict[str, Any]) -> bool:
         return "content" in parameters and isinstance(parameters["content"], str) and len(parameters["content"].strip()) > 0
 
     def execute(self, parameters: dict[str, Any]) -> ToolResult:
         content = str(parameters["content"]).strip()
-        type_str = str(parameters.get("memory_type", "USER_FACT")).upper()
+        type_str = str(parameters.get("memory_type", "PROFILE")).upper()
+        project_id = parameters.get("project_id")
+        imp_str = str(parameters.get("importance", "HIGH")).upper()
 
         try:
-            mem_type = MemoryType(type_str) if type_str in MemoryType.__members__ else MemoryType.USER_FACT
+            mem_type = MemoryType(type_str) if type_str in MemoryType.__members__ else MemoryType.PROFILE
+            importance = MemoryImportance(imp_str) if imp_str in MemoryImportance.__members__ else MemoryImportance.HIGH
+
             item = self.memory_manager.remember(
                 content=content,
                 memory_type=mem_type,
                 source=MemorySource.USER_EXPLICIT,
-                importance=MemoryImportance.HIGH,
+                importance=importance,
+                project_id=project_id,
             )
 
             if not item:
@@ -59,7 +79,13 @@ class RememberTool(BaseTool):
             return ToolResult(
                 status=ExecutionStatus.SUCCESS,
                 message=msg,
-                data={"id": item.id, "content": item.content, "type": item.type.value},
+                data={
+                    "id": item.id,
+                    "memory_id": item.memory_id,
+                    "content": item.content,
+                    "type": item.type.value,
+                    "project_id": item.project_id,
+                },
             )
         except Exception as e:
             logger.error(f"RememberTool failed: {e}")

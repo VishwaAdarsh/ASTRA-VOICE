@@ -123,6 +123,13 @@ class Config:
         self.wake_word_post_wake_buffer = float(os.getenv("WAKE_WORD_POST_WAKE_BUFFER", "0.8"))
         self.wake_word_model_path = os.getenv("WAKE_WORD_MODEL_PATH", "")
 
+        # Voice Interruption & Barge-In Configuration (Phase V2-06)
+        self.barge_in_enabled = os.getenv("BARGE_IN_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.barge_in_energy_threshold = float(os.getenv("BARGE_IN_THRESHOLD", os.getenv("BARGE_IN_ENERGY_THRESHOLD", "650.0")))
+        self.barge_in_min_speech_duration = float(os.getenv("BARGE_IN_MIN_SPEECH_DURATION", "0.25"))
+        self.barge_in_cooldown = float(os.getenv("BARGE_IN_COOLDOWN", "1.5"))
+        self.barge_in_grace_period = float(os.getenv("BARGE_IN_GRACE_PERIOD", "0.2"))
+
 
         # LLM Brain Configuration (Phase 4)
         self.llm_provider = os.getenv("LLM_PROVIDER", "mock").lower()
@@ -146,12 +153,18 @@ class Config:
         self.max_research_sources = int(os.getenv("MAX_RESEARCH_SOURCES", "8"))
         self.web_cache_ttl_sec = int(os.getenv("WEB_CACHE_TTL_SEC", "3600"))
 
-        # Memory & Personal Context Subsystem (Phase 7)
+        # Memory & Personal Context Subsystem (Phase 7 & Phase 11 Memory V2)
         db_rel_path = os.getenv("DATABASE_PATH", "data/astra_memory.db")
         self.database_path = self.root_dir / db_rel_path
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self.memory_enabled = os.getenv("MEMORY_ENABLED", "true").lower() in ("true", "1", "yes")
         self.max_retrieved_memories = int(os.getenv("MAX_RETRIEVED_MEMORIES", "10"))
         self.memory_expiration_days = int(os.getenv("MEMORY_EXPIRATION_DAYS", "30"))
+        self.memory_context_max_items = int(os.getenv("MEMORY_CONTEXT_MAX_ITEMS", "5"))
+        self.memory_context_max_chars = int(os.getenv("MEMORY_CONTEXT_MAX_CHARS", "2000"))
+        self.memory_inferred_retention_days = int(os.getenv("MEMORY_INFERRED_RETENTION_DAYS", "7"))
+        self.memory_min_confidence = float(os.getenv("MEMORY_MIN_CONFIDENCE", "0.5"))
+        self.memory_cleanup_interval_sec = int(os.getenv("MEMORY_CLEANUP_INTERVAL_SEC", "3600"))
 
         # Vision, Screen Understanding & Visual Context (Phase 8)
         self.vision_provider = os.getenv("VISION_PROVIDER", "mock").lower()
@@ -184,6 +197,12 @@ class Config:
         self.network_timeout = float(os.getenv("NETWORK_TIMEOUT", "15.0"))
         self.log_max_bytes = int(os.getenv("LOG_MAX_BYTES", str(5 * 1024 * 1024)))  # 5MB
         self.log_backup_count = int(os.getenv("LOG_BACKUP_COUNT", "3"))
+
+        # Desktop Context Engine (Phase V2-08)
+        self.desktop_context_enabled = os.getenv("DESKTOP_CONTEXT_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.clipboard_context_enabled = os.getenv("CLIPBOARD_CONTEXT_ENABLED", "false").lower() in ("true", "1", "yes")
+        self.screen_context_enabled = os.getenv("SCREEN_CONTEXT_ENABLED", "true").lower() in ("true", "1", "yes")
+        self.context_cache_ttl_seconds = float(os.getenv("CONTEXT_CACHE_TTL_SECONDS", "0.5"))
 
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""

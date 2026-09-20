@@ -17,6 +17,7 @@ from src.voice.errors import MicrophoneUnavailableError, STTError
 from src.voice.events import VoiceEvent, VoiceEventListener
 from src.voice.microphone import MicrophoneManager
 from src.voice.models import AudioFrame, AudioSegment, VoiceMetrics, VoiceState, VADState
+from src.voice.barge_in import BargeInCoordinator
 from src.voice.segmenter import SpeechSegmenter
 from src.voice.stt import SpeechToTextProvider
 from src.voice.tts import TextToSpeechProvider
@@ -38,6 +39,7 @@ class VoiceSession:
         tts_provider: TextToSpeechProvider,
         config: Config | None = None,
         event_listener: VoiceEventListener | None = None,
+        event_bus: Any | None = None,
     ):
         self.agent = agent
         self.mic = microphone_manager
@@ -46,6 +48,7 @@ class VoiceSession:
         self.config = config or Config()
         self.state = VoiceState.IDLE
         self.event_listener = event_listener
+        self.event_bus = event_bus or getattr(agent, "event_bus", None)
 
         # Initialize speech segmenter using microphone configuration
         self.segmenter = SpeechSegmenter(
@@ -57,6 +60,9 @@ class VoiceSession:
             maximum_utterance_duration=getattr(self.config, "voice_max_utterance_duration", 15.0),
         )
 
+        # Initialize barge-in interruption coordinator (Phase V2-06)
+        self.barge_in = BargeInCoordinator(self, config=self.config)
+
         self.last_metrics: VoiceMetrics | None = None
 
     def _set_state(self, new_state: VoiceState, details: dict | None = None) -> None:
@@ -65,24 +71,71 @@ class VoiceSession:
         self.state = new_state
         logger.info(f"VOICE_STATE: {old_state} -> {new_state}")
 
+        payload = {
+            "old_state": old_state.value if hasattr(old_state, "value") else str(old_state),
+            "new_state": new_state.value if hasattr(new_state, "value") else str(new_state),
+            **(details or {}),
+        }
+
         if self.event_listener:
             try:
                 event_name = f"{new_state}_STARTED"
                 event_type = getattr(VoiceEvent, event_name, VoiceEvent.VOICE_SESSION_STARTED)
-                self.event_listener(
-                    event_type,
-                    {"old_state": old_state, "new_state": new_state, **(details or {})},
-                )
+                self.event_listener(event_type, payload)
             except Exception as e:
                 logger.error(f"Error in voice event listener: {e}")
 
+        if self.event_bus:
+            try:
+                from src.core.events.models import ASTRAEvent, AstraEventType
+                bus_name = f"VOICE_{new_state.name if hasattr(new_state, 'name') else str(new_state).upper()}_STARTED"
+                bus_type = getattr(AstraEventType, bus_name, None)
+                if not bus_type:
+                    bus_type = getattr(AstraEventType, f"VOICE_{new_state.name if hasattr(new_state, 'name') else str(new_state).upper()}", AstraEventType.VOICE_SESSION_STARTED)
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=bus_type,
+                        source="voice",
+                        payload=payload,
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Error publishing voice state to EventBus: {e}")
+
     def emit_event(self, event: VoiceEvent, payload: dict | None = None) -> None:
         """Emit an explicit domain event."""
+        payload_dict = payload or {}
         if self.event_listener:
             try:
-                self.event_listener(event, payload or {})
+                self.event_listener(event, payload_dict)
             except Exception as e:
                 logger.error(f"Error emitting event {event}: {e}")
+
+        if self.event_bus:
+            try:
+                from src.core.events.models import ASTRAEvent, AstraEventType, EventPriority
+                evt_name = event.name if hasattr(event, "name") else str(event)
+                bus_type = getattr(AstraEventType, evt_name, None)
+                if not bus_type:
+                    bus_type = getattr(AstraEventType, f"VOICE_{evt_name}", None)
+                if not bus_type:
+                    bus_type = evt_name
+
+                priority = (
+                    EventPriority.HIGH
+                    if any(kw in evt_name for kw in ("INTERRUPT", "ERROR", "BARGE_IN"))
+                    else EventPriority.NORMAL
+                )
+                self.event_bus.publish(
+                    ASTRAEvent(
+                        event_type=bus_type,
+                        source="voice",
+                        priority=priority,
+                        payload=payload_dict,
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Error publishing voice domain event to EventBus: {e}")
 
     def listen_and_process(
         self,
@@ -166,31 +219,83 @@ class VoiceSession:
             metrics.agent_end_ts = time.time()
             self.emit_event(VoiceEvent.PROCESSING_COMPLETED, {"response": response_text})
 
-            # 5. Route to TTS Speech Output
+            # 5. Route to TTS Speech Output with Barge-In Interruption Support
             self._set_state(VoiceState.SPEAKING)
             self.emit_event(VoiceEvent.TTS_STARTED)
 
             metrics.tts_start_ts = time.time()
             clean_speech_text = response_text.replace("✓", "").strip()
-            self.tts.speak(clean_speech_text)
+
+            # Start TTS playback in background (block=False)
+            self.tts.speak(clean_speech_text, block=False)
+
+            # Monitor for barge-in while speaking
+            interrupted = self.barge_in.monitor_while_speaking(
+                clean_speech_text,
+                tts_start_ts=metrics.tts_start_ts,
+                metrics=metrics,
+            )
+
             metrics.tts_end_ts = time.time()
             metrics.total_duration_s = metrics.tts_end_ts - metrics.capture_start_ts
 
-            self.emit_event(VoiceEvent.TTS_COMPLETED)
-
-            # 6. Latency Telemetry Logging
-            if getattr(self.config, "performance_logging", True):
+            if not interrupted:
+                self.emit_event(VoiceEvent.TTS_COMPLETED)
+                # 6. Latency Telemetry Logging
+                if getattr(self.config, "performance_logging", True):
+                    logger.info(
+                        f"[VOICE LATENCY] Turn={metrics.total_turn_ms}ms | "
+                        f"Speech->STT={metrics.speech_to_stt_ms}ms | "
+                        f"STT={metrics.stt_latency_ms}ms | "
+                        f"Agent={metrics.agent_latency_ms}ms | "
+                        f"TTS={metrics.tts_startup_latency_ms}ms"
+                    )
+                self._set_state(VoiceState.IDLE)
+                return response_text, tool_result
+            else:
+                # Interrupted! Transition to LISTENING and capture the follow-up/stop command
                 logger.info(
-                    f"[VOICE LATENCY] Turn={metrics.total_turn_ms}ms | "
-                    f"Speech->STT={metrics.speech_to_stt_ms}ms | "
-                    f"STT={metrics.stt_latency_ms}ms | "
-                    f"Agent={metrics.agent_latency_ms}ms | "
-                    f"TTS={metrics.tts_startup_latency_ms}ms"
+                    f"[BARGE-IN] Interrupted! Total latency: {metrics.total_interruption_latency_ms}ms"
+                )
+                for f in self.barge_in.buffered_speech_frames:
+                    self.segmenter._pre_roll_buffer.append(f)
+
+                self._set_state(VoiceState.LISTENING)
+                self.emit_event(VoiceEvent.LISTENING_STARTED)
+                interruption_metrics = VoiceMetrics(capture_start_ts=time.time())
+                interruption_segment = self._capture_speech_segment(
+                    timeout=getattr(self.config, "wake_word_command_timeout", 5.0),
+                    metrics=interruption_metrics,
                 )
 
-            # 7. Return to IDLE
-            self._set_state(VoiceState.IDLE)
-            return response_text, tool_result
+                if interruption_segment is None:
+                    logger.info("[BARGE-IN] No further speech detected after interruption. Returning to IDLE.")
+                    self._set_state(VoiceState.IDLE)
+                    return "Interrupted. No follow-up command.", None
+
+                self._set_state(VoiceState.PROCESSING)
+                self.emit_event(VoiceEvent.TRANSCRIPTION_STARTED)
+                int_transcript = self.stt.transcribe(
+                    interruption_segment.pcm_data,
+                    sample_rate=interruption_segment.sample_rate,
+                )
+                self.emit_event(VoiceEvent.TRANSCRIPTION_COMPLETED, {"transcript": int_transcript})
+
+                if not int_transcript or not int_transcript.strip():
+                    self._set_state(VoiceState.IDLE)
+                    return "Interrupted.", None
+
+                cleaned_cmd = int_transcript.lower().strip().strip(".,!?:;")
+                stop_words = ("stop", "stop talking", "quiet", "cancel", "shut up", "hush", "be quiet", "silence")
+                if cleaned_cmd in stop_words or any(cleaned_cmd.startswith(sw) for sw in stop_words):
+                    logger.info(f"[BARGE-IN] Explicit stop command recognized: '{int_transcript}'")
+                    self.emit_event(VoiceEvent.COMMAND_RECEIVED, {"command": int_transcript})
+                    self._set_state(VoiceState.IDLE)
+                    return "Speech stopped.", None
+
+                logger.info(f"[BARGE-IN] Processing new command after interruption: '{int_transcript}'")
+                self.emit_event(VoiceEvent.COMMAND_RECEIVED, {"command": int_transcript})
+                return self.listen_and_process(record_seconds=None)
 
         except MicrophoneUnavailableError as mue:
             logger.error(f"Microphone error: {mue.message}")
@@ -256,7 +361,7 @@ class VoiceSession:
     def stop_speaking(self) -> None:
         """Interrupt and stop speech playback immediately."""
         self.tts.stop()
-        if self.state == VoiceState.SPEAKING:
+        if self.state in (VoiceState.SPEAKING, VoiceState.BARGE_IN_DETECTED, VoiceState.INTERRUPTING):
             self._set_state(VoiceState.INTERRUPTED)
             self.emit_event(VoiceEvent.VOICE_INTERRUPTED)
             self._set_state(VoiceState.IDLE)

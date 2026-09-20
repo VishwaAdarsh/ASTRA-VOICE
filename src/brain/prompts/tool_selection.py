@@ -5,6 +5,7 @@ Dynamically generates standardized OpenAPI/JSON tool schemas directly from ToolR
 
 from typing import TYPE_CHECKING, Any
 from src.core.logger import get_logger
+from src.core.capabilities.schemas import LLMToolSchemaAdapter
 
 if TYPE_CHECKING:
     from src.tools.registry import ToolRegistry
@@ -16,7 +17,17 @@ def generate_tool_schemas(registry: "ToolRegistry") -> list[dict[str, Any]]:
     """Convert registered BaseTool instances in registry into structured schemas for the LLM.
     
     Filters internal tools, validates schemas, and prevents duplicates.
+    Leverages LLMToolSchemaAdapter when capability_registry is present.
     """
+    if hasattr(registry, "capability_registry") and registry.capability_registry:
+        caps = registry.capability_registry.list_all()
+        visible_caps = []
+        for cap in caps:
+            if cap.handler and getattr(cap.handler, "expose_to_llm", True) is False:
+                continue
+            visible_caps.append(cap)
+        return LLMToolSchemaAdapter.generate_schemas(visible_caps, use_short_name=True)
+
     schemas: list[dict[str, Any]] = []
     seen_names: set[str] = set()
 

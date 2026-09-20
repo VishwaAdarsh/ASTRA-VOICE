@@ -34,9 +34,11 @@ class VoiceManager:
         event_listener: VoiceEventListener | None = None,
         health_manager: HealthManager | None = None,
         mic: MicrophoneManager | None = None,
+        event_bus: Any | None = None,
     ):
         self.agent = agent
         self.config = config or Config()
+        self.event_bus = event_bus or getattr(agent, "event_bus", None)
         self.health_manager = health_manager or getattr(agent, "health_manager", None)
 
         # Build audio/voice config with complete V2 parameters
@@ -89,6 +91,7 @@ class VoiceManager:
             tts_provider=self.tts,
             config=self.config,
             event_listener=event_listener,
+            event_bus=self.event_bus,
         )
 
         # Initialize Local Wake Word Subsystem (Phase V2-05)
@@ -163,6 +166,17 @@ class VoiceManager:
                 "WakeWord", HealthStatus.UNAVAILABLE, "Wake-word detector unavailable or failed initialization"
             )
 
+        # 5. Voice Interruption & Barge-In Subsystem (Phase V2-06)
+        if not getattr(self.config, "barge_in_enabled", True):
+            self.health_manager.set_status(
+                "BargeIn", HealthStatus.DISABLED, "Barge-in intentionally disabled in configuration"
+            )
+        else:
+            thresh = getattr(self.config, "barge_in_energy_threshold", 650.0)
+            self.health_manager.set_status(
+                "BargeIn", HealthStatus.READY, f"Active (threshold={thresh:.0f} RMS)"
+            )
+
     @property
     def mic(self) -> MicrophoneManager:
         return self._mic
@@ -185,6 +199,15 @@ class VoiceManager:
         self.update_health()
         logger.info(f"[WAKE] Hands-free wake word enabled status set to: {enabled}")
         return self.config.wake_word_enabled
+
+    def toggle_barge_in(self, enabled: bool) -> bool:
+        """Dynamically enable or disable voice barge-in and speech interruption."""
+        self.config.barge_in_enabled = enabled
+        if hasattr(self, "session") and hasattr(self.session, "barge_in"):
+            self.session.barge_in.detector.enabled = enabled
+        self.update_health()
+        logger.info(f"[BARGE-IN] Voice barge-in enabled status set to: {enabled}")
+        return self.config.barge_in_enabled
 
     def start_wake_word_listener(self) -> None:
         """Start continuous hands-free 'Hey ASTRA' background listener."""

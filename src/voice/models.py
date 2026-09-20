@@ -22,6 +22,8 @@ class VoiceState(str, Enum):
     CAPTURING = "CAPTURING"
     PROCESSING = "PROCESSING"
     SPEAKING = "SPEAKING"
+    BARGE_IN_DETECTED = "BARGE_IN_DETECTED"
+    INTERRUPTING = "INTERRUPTING"
     INTERRUPTED = "INTERRUPTED"
     ERROR = "ERROR"
 
@@ -84,6 +86,17 @@ class WakeWordConfig:
 
 
 @dataclass
+class BargeInConfig:
+    """Voice barge-in and speech interruption configuration."""
+
+    enabled: bool = True
+    energy_threshold: float = 650.0  # RMS threshold higher than idle VAD to prevent self-interruption from speaker bleed
+    min_speech_duration: float = 0.25  # Sustained speech duration required to confirm barge-in (seconds)
+    cooldown_seconds: float = 1.5  # Debounce window after an interruption before another barge-in can trigger
+    grace_period_seconds: float = 0.2  # Initial period after TTS starts where speech triggers are suppressed
+
+
+@dataclass
 class VoiceConfig:
     """Voice subsystem master configuration."""
 
@@ -97,6 +110,7 @@ class VoiceConfig:
     api_key: str = ""
     audio: AudioConfig = field(default_factory=AudioConfig)
     wake_word: WakeWordConfig = field(default_factory=WakeWordConfig)
+    barge_in: BargeInConfig = field(default_factory=BargeInConfig)
 
 
 @dataclass
@@ -161,7 +175,31 @@ class VoiceMetrics:
     agent_end_ts: float = 0.0
     tts_start_ts: float = 0.0
     tts_end_ts: float = 0.0
+    barge_in_detected_ts: float = 0.0
+    tts_stop_requested_ts: float = 0.0
+    tts_stopped_ts: float = 0.0
     total_duration_s: float = 0.0
+
+    @property
+    def barge_in_detection_latency_ms(self) -> float:
+        """Latency from user speech onset to barge-in confirmation."""
+        if self.barge_in_detected_ts >= self.speech_detected_ts > 0:
+            return round((self.barge_in_detected_ts - self.speech_detected_ts) * 1000.0, 1)
+        return 0.0
+
+    @property
+    def tts_stop_latency_ms(self) -> float:
+        """Latency from TTS stop request to speech completely halting."""
+        if self.tts_stopped_ts >= self.tts_stop_requested_ts > 0:
+            return round((self.tts_stopped_ts - self.tts_stop_requested_ts) * 1000.0, 1)
+        return 0.0
+
+    @property
+    def total_interruption_latency_ms(self) -> float:
+        """Total latency from user speech onset to TTS playback halt."""
+        if self.tts_stopped_ts >= self.speech_detected_ts > 0:
+            return round((self.tts_stopped_ts - self.speech_detected_ts) * 1000.0, 1)
+        return 0.0
 
     @property
     def speech_to_stt_ms(self) -> float:

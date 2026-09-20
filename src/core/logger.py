@@ -16,6 +16,8 @@ class SecretRedactionFilter(logging.Filter):
     """Logging filter to redact API keys, bearer tokens, and secrets from log entries."""
 
     SECRET_PATTERNS = [
+        re.compile(r"((?:token|secret|api[_-]?key|password|passwd|key)[\"'\s:=]+(?:is\s+)?)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
+        re.compile(r"((?:ak|sk)[_-][a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
         re.compile(r"(api[_-]?key[\"'\s:=]+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
         re.compile(r"(\bkey[\"'\s:=]+)([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),
         re.compile(r"(sk[_-][a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE),

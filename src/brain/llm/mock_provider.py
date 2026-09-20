@@ -43,6 +43,8 @@ class MockLLMProvider(LLMProvider):
         # Extract current request text from full context prompt
         if "Current Request:" in prompt:
             req_text = prompt.split("Current Request:")[-1].strip().lower()
+        elif "User Command:" in prompt:
+            req_text = prompt.split("User Command:")[-1].split("Execution Steps Taken So Far:")[0].strip().lower()
         else:
             req_text = prompt.strip().lower()
 

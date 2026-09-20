@@ -29,6 +29,10 @@ def calculate_rms(pcm_data: bytes, sample_width: int = 2) -> float:
         return 0.0
 
 
+# Alias for calculate_rms
+audio_rms = calculate_rms
+
+
 def pcm_duration_seconds(
     pcm_data: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2
 ) -> float:

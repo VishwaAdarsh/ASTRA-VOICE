@@ -42,6 +42,7 @@ export const HomeScreen = () => {
     if (assistantState === "listening") return "Listening...";
     if (assistantState === "thinking") return "Thinking...";
     if (assistantState === "speaking") return "Speaking...";
+    if (assistantState === "interrupted") return "Interrupted...";
     return "Tap orb or say \"Hey Astra\"";
   };
 
@@ -61,6 +62,7 @@ export const HomeScreen = () => {
             (assistantState === "listening" ? "bg-red-400 animate-ping" :
              assistantState === "thinking" ? "bg-amber-400 animate-pulse" :
              assistantState === "speaking" ? "bg-emerald-400 animate-bounce" :
+             assistantState === "interrupted" ? "bg-amber-500 animate-ping" :
              "bg-[#7c5cfc]")
           } />
           <span>{assistantState.toUpperCase()}</span>
