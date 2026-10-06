@@ -138,16 +138,8 @@ class AstraAgent:
             verifier=self.verifier,
         )
 
-        # Initialize Phase 4 LLM Subsystem
-        model_config = ModelConfig(
-            provider=self.config.llm_provider,
-            model=self.config.llm_model,
-            temperature=self.config.llm_temperature,
-            max_output_tokens=self.config.llm_max_output_tokens,
-            timeout=self.config.llm_timeout,
-            retry_count=self.config.llm_retry_count,
-            api_key=self.config.llm_api_key,
-        )
+        # Initialize LLM Subsystem via provider-agnostic ModelConfig
+        model_config = ModelConfig.from_app_config(self.config)
         self.llm_client = LLMClient(
             config=model_config,
             provider=llm_provider,

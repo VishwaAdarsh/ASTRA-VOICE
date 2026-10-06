@@ -113,6 +113,28 @@ class Config:
         self.tts_volume = float(os.getenv("TTS_VOLUME", "1.0"))
         self.voice_language = os.getenv("VOICE_LANGUAGE", "en-US")
 
+        # Text-To-Speech (TTS) Provider Configuration ('pyttsx3' local offline, 'elevenlabs' cloud voice)
+        # SECURITY: TTS API keys are loaded strictly from environment and never exposed to frontend
+        _tts_env = os.getenv("TTS_API_KEY", "").strip()
+        _eleven_env = os.getenv("ELEVENLABS_API_KEY", "").strip()
+        _voice_env = self.voice_api_key.strip()
+        if _tts_env.startswith("sk_"):
+            self.tts_api_key = _tts_env
+        elif _eleven_env.startswith("sk_"):
+            self.tts_api_key = _eleven_env
+        elif _voice_env.startswith("sk_"):
+            self.tts_api_key = _voice_env
+        else:
+            self.tts_api_key = _tts_env or _eleven_env or _voice_env
+        self.elevenlabs_api_key = self.tts_api_key
+        self.tts_base_url = os.getenv("TTS_BASE_URL", "https://api.elevenlabs.io").strip().rstrip("/")
+        self.tts_model = os.getenv("TTS_MODEL", "eleven_turbo_v2_5").strip() or "eleven_turbo_v2_5"
+        self.tts_voice_id = os.getenv("TTS_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb").strip() or "JBFqnCBsd6RMkjVDRZzb"
+        self.tts_timeout = float(os.getenv("TTS_TIMEOUT", "15.0"))
+        self.tts_max_retries = int(os.getenv("TTS_MAX_RETRIES", "2"))
+        self.tts_stability = float(os.getenv("TTS_STABILITY", "0.5"))
+        self.tts_similarity_boost = float(os.getenv("TTS_SIMILARITY_BOOST", "0.75"))
+
         # Hands-Free Wake Word Subsystem Configuration (Phase V2-05)
         self.wake_word_enabled = os.getenv("WAKE_WORD_ENABLED", "true").lower() in ("true", "1", "yes")
         self.wake_word_phrase = os.getenv("WAKE_WORD_PHRASE", "hey astra").strip().lower()
@@ -140,6 +162,17 @@ class Config:
         self.llm_timeout = float(os.getenv("LLM_TIMEOUT", "10.0"))
         self.llm_retry_count = int(os.getenv("LLM_RETRY_COUNT", "2"))
         self.llm_fallback_enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() in ("true", "1", "yes")
+
+        # Ollama LLM Provider (Cloud API by default: https://ollama.com/api/chat)
+        # SECURITY: the key is environment-only; never hard-code, log, or expose it to the frontend.
+        self.ollama_api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "https://ollama.com").strip().rstrip("/")
+        self.ollama_chat_endpoint = os.getenv("OLLAMA_CHAT_ENDPOINT", "/api/chat").strip()
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma4:31b").strip() or "gemma4:31b"
+        self.ollama_timeout = float(os.getenv("OLLAMA_TIMEOUT", "60"))
+        self.ollama_max_retries = int(os.getenv("OLLAMA_MAX_RETRIES", "2"))
+        # Thinking control: "false" (default, no reasoning trace), "true", "low"/"medium"/"high", or "" for model default
+        self.ollama_think = os.getenv("OLLAMA_THINK", "false").strip().lower() or None
 
 
 
@@ -203,6 +236,13 @@ class Config:
         self.clipboard_context_enabled = os.getenv("CLIPBOARD_CONTEXT_ENABLED", "false").lower() in ("true", "1", "yes")
         self.screen_context_enabled = os.getenv("SCREEN_CONTEXT_ENABLED", "true").lower() in ("true", "1", "yes")
         self.context_cache_ttl_seconds = float(os.getenv("CONTEXT_CACHE_TTL_SECONDS", "0.5"))
+
+    @property
+    def llm_active_model(self) -> str:
+        """Model name actually used by the configured LLM provider (safe to expose)."""
+        if self.llm_provider == "ollama":
+            return self.ollama_model
+        return self.llm_model
 
     def is_app_allowed(self, app_name: str) -> bool:
         """Check if an application name is in the allowlist."""

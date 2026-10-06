@@ -108,6 +108,14 @@ class VoiceConfig:
     tts_volume: float = 1.0
     voice_language: str = "en-US"
     api_key: str = ""
+    tts_api_key: str = ""
+    tts_model: str = "eleven_turbo_v2_5"
+    tts_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
+    tts_base_url: str = "https://api.elevenlabs.io"
+    tts_timeout: float = 15.0
+    tts_max_retries: int = 2
+    tts_stability: float = 0.5
+    tts_similarity_boost: float = 0.75
     audio: AudioConfig = field(default_factory=AudioConfig)
     wake_word: WakeWordConfig = field(default_factory=WakeWordConfig)
     barge_in: BargeInConfig = field(default_factory=BargeInConfig)

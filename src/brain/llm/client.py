@@ -17,12 +17,30 @@ from src.brain.llm.errors import (
     LLMTimeoutError,
 )
 from src.brain.llm.factory import LLMProviderFactory
-from src.brain.llm.models import DecisionType, LLMDecision, ModelConfig
+from src.brain.llm.models import DecisionType, LLMDecision, ModelConfig, ProviderHealthState
 from src.brain.llm.provider import LLMProvider
 from src.core.health import HealthManager, HealthStatus
 from src.core.logger import get_logger
 
 logger = get_logger()
+
+# Error category -> (provider-level state, subsystem HealthStatus)
+_ERROR_STATE_MAP: dict[LLMErrorType, tuple[ProviderHealthState, HealthStatus]] = {
+    LLMErrorType.RATE_LIMITED: (ProviderHealthState.RATE_LIMITED, HealthStatus.DEGRADED),
+    LLMErrorType.QUOTA_EXHAUSTED: (ProviderHealthState.QUOTA_EXHAUSTED, HealthStatus.UNAVAILABLE),
+    LLMErrorType.AUTH_FAILED: (ProviderHealthState.AUTH_FAILED, HealthStatus.UNAVAILABLE),
+    LLMErrorType.INVALID_CONFIGURATION: (ProviderHealthState.UNAVAILABLE, HealthStatus.UNAVAILABLE),
+}
+
+_STATE_LABELS: dict[ProviderHealthState, str] = {
+    ProviderHealthState.AVAILABLE: "Available",
+    ProviderHealthState.DEGRADED: "Degraded",
+    ProviderHealthState.RATE_LIMITED: "Rate Limited",
+    ProviderHealthState.QUOTA_EXHAUSTED: "Quota Exhausted",
+    ProviderHealthState.AUTH_FAILED: "Authentication Failed",
+    ProviderHealthState.UNAVAILABLE: "Unavailable",
+    ProviderHealthState.UNKNOWN: "Unknown",
+}
 
 
 class LLMClient:
@@ -37,12 +55,45 @@ class LLMClient:
         self.config = config
         self.provider = provider or LLMProviderFactory.create(self.config)
         self.health_manager = health_manager
+        self.provider_state: ProviderHealthState = ProviderHealthState.UNKNOWN
+        self.last_error_type: LLMErrorType | None = None
+
+    # ------------------------------------------------------------------
+    # Provider identity / status (safe, credential-free)
+    # ------------------------------------------------------------------
+    @property
+    def provider_name(self) -> str:
+        return str(getattr(self.config, "provider", "") or "unknown").lower()
+
+    @property
+    def model_name(self) -> str:
+        return str(getattr(self.provider, "model_name", None) or self.config.model_name or "")
+
+    def _provider_label(self) -> str:
+        return {"ollama": "Ollama", "gemini": "Gemini", "mock": "Mock"}.get(self.provider_name, self.provider_name.title())
+
+    def _record_state(self, state: ProviderHealthState, health: HealthStatus, detail: str = "") -> None:
+        self.provider_state = state
+        if self.health_manager:
+            label = f"{self._provider_label()} ({self.model_name}): {_STATE_LABELS[state]}"
+            self.health_manager.set_status("LLM", health, f"{label} - {detail}" if detail else label)
+
+    def get_provider_status(self) -> dict[str, Any]:
+        """User-safe provider status, e.g. {'provider': 'Ollama', 'model': 'gemma4:31b', 'status': 'Available'}."""
+        return {
+            "provider": self._provider_label(),
+            "provider_id": self.provider_name,
+            "model": self.model_name,
+            "state": self.provider_state.value,
+            "status": _STATE_LABELS[self.provider_state],
+            "last_error": self.last_error_type.value if self.last_error_type else None,
+        }
 
     @staticmethod
     def _user_friendly_error(error_type: LLMErrorType, err: Exception) -> str:
         """Map technical error types to user-friendly truthful messages."""
         if error_type == LLMErrorType.QUOTA_EXHAUSTED:
-            return "Daily LLM quota limit reached. Please check your Gemini API quota or try again later."
+            return "LLM quota limit reached. Please check your LLM provider quota or try again later."
         elif error_type == LLMErrorType.AUTH_FAILED:
             return "LLM authentication failed. Please check your API key configuration."
         elif error_type == LLMErrorType.RATE_LIMITED:
@@ -71,7 +122,7 @@ class LLMClient:
         for attempt in range(1, max_attempts + 1):
             try:
                 logger.info(
-                    f"LLM_REQUEST attempt {attempt}/{max_attempts} (provider='{self.config.provider}', model='{self.config.model_name}')"
+                    f"LLM_REQUEST attempt {attempt}/{max_attempts} (provider='{self.config.provider}', model='{self.model_name}')"
                 )
                 decision = self.provider.generate_structured(
                     prompt=prompt,
@@ -79,16 +130,20 @@ class LLMClient:
                     tool_schemas=tool_schemas,
                 )
 
+                # Stamp safe provenance metadata (provider-agnostic)
+                if not decision.provider:
+                    decision.provider = self.provider_name
+                if not decision.model:
+                    decision.model = self.model_name
+
                 # Record healthy status on successful inference
-                if self.health_manager:
-                    self.health_manager.set_status(
-                        "LLM",
-                        HealthStatus.HEALTHY,
-                        f"Operational with provider '{self.config.provider}'",
-                    )
+                self.last_error_type = None
+                self._record_state(ProviderHealthState.AVAILABLE, HealthStatus.HEALTHY)
 
                 logger.info(
-                    f"LLM_DECISION: type={decision.decision_type}, tool={decision.tool_name}, latency={decision.usage.latency_ms:.1f}ms"
+                    f"LLM_DECISION: type={decision.decision_type}, tool={decision.tool_name}, "
+                    f"provider={decision.provider}, model={decision.model}, "
+                    f"latency={decision.usage.latency_ms:.1f}ms, retries={attempt - 1}"
                 )
                 return decision
 
@@ -97,21 +152,13 @@ class LLMClient:
                 is_retryable = getattr(e, "retryable", False)
                 retry_after = getattr(e, "retry_after", None)
                 err_msg = getattr(e, "message", str(e))
+                self.last_error_type = err_type
 
                 # Update health manager diagnostics
-                if self.health_manager:
-                    if err_type == LLMErrorType.RATE_LIMITED:
-                        self.health_manager.set_status(
-                            "LLM",
-                            HealthStatus.DEGRADED,
-                            f"Rate limited: {err_msg}",
-                        )
-                    else:
-                        self.health_manager.set_status(
-                            "LLM",
-                            HealthStatus.UNAVAILABLE,
-                            f"{err_type.value}: {err_msg}",
-                        )
+                state, health = _ERROR_STATE_MAP.get(
+                    err_type, (ProviderHealthState.UNAVAILABLE, HealthStatus.UNAVAILABLE)
+                )
+                self._record_state(state, health, err_type.value)
 
                 # Non-retryable failure: abort retries immediately (Auth, Quota, InvalidConfig, Policy)
                 if not is_retryable:
@@ -125,6 +172,8 @@ class LLMClient:
                         reason=err_msg,
                         retryable=False,
                         retry_after=retry_after,
+                        provider=self.provider_name,
+                        model=self.model_name,
                     )
 
                 # Retryable error: backoff if attempts remain
@@ -155,6 +204,8 @@ class LLMClient:
                         reason=err_msg,
                         retryable=True,
                         retry_after=retry_after,
+                        provider=self.provider_name,
+                        model=self.model_name,
                     )
 
         # Fallback return in case loop completes without return
@@ -168,11 +219,15 @@ class LLMClient:
     def generate_text(self, prompt: str, system_prompt: str | None = None) -> str:
         """Generate plain text with error handling."""
         try:
-            return self.provider.generate(prompt=prompt, system_prompt=system_prompt)
+            text = self.provider.generate(prompt=prompt, system_prompt=system_prompt)
+            self.last_error_type = None
+            self._record_state(ProviderHealthState.AVAILABLE, HealthStatus.HEALTHY)
+            return text
         except Exception as e:
             err_type = getattr(e, "error_type", LLMErrorType.UNKNOWN_ERROR)
-            if self.health_manager:
-                self.health_manager.set_status("LLM", HealthStatus.UNAVAILABLE, f"{err_type.value}: {e}")
+            self.last_error_type = err_type
+            state, health = _ERROR_STATE_MAP.get(err_type, (ProviderHealthState.UNAVAILABLE, HealthStatus.UNAVAILABLE))
+            self._record_state(state, health, err_type.value)
             raise
 
     def check_health(self) -> dict[str, Any]:

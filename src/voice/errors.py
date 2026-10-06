@@ -60,6 +60,30 @@ class TTSTimeoutError(TTSError):
     pass
 
 
+class ElevenLabsTTSError(TTSError):
+    """Base exception for ElevenLabs Text-to-Speech failures."""
+
+    pass
+
+
+class ElevenLabsAuthError(ElevenLabsTTSError):
+    """Raised when ElevenLabs API key is missing or authentication fails."""
+
+    pass
+
+
+class ElevenLabsRateLimitError(ElevenLabsTTSError):
+    """Raised when ElevenLabs API rate limits are exceeded."""
+
+    pass
+
+
+class ElevenLabsQuotaExceededError(ElevenLabsTTSError):
+    """Raised when ElevenLabs account character quota is exhausted or paid plan required."""
+
+    pass
+
+
 class VoiceConfigurationError(VoiceError):
     """Raised when voice subsystem parameters or provider specifications are invalid."""
 

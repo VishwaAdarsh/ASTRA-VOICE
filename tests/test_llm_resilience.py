@@ -68,11 +68,29 @@ def test_factory_rejects_unknown_provider():
 
 def test_factory_rejects_deferred_providers():
     """Factory must raise NotImplementedError for providers deferred to Phase V2-20."""
-    for deferred in ["openai", "anthropic", "claude", "ollama", "local"]:
+    for deferred in ["openai", "anthropic", "claude", "local"]:
         config = ModelConfig(provider=deferred)
         with pytest.raises(NotImplementedError) as excinfo:
             LLMProviderFactory.create(config)
         assert "deferred to a future phase" in str(excinfo.value)
+
+
+def test_factory_resolves_ollama_provider(monkeypatch):
+    """Factory must instantiate OllamaProvider when provider='ollama', rejecting missing key without Mock fallback."""
+    from src.brain.llm.ollama_provider import OllamaProvider
+
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    # Missing key -> LLMConfigError (never silently falls back to Mock)
+    with pytest.raises(LLMConfigError) as excinfo:
+        LLMProviderFactory.create(ModelConfig(provider="ollama", api_key=""))
+    assert "Ollama API key is missing" in str(excinfo.value)
+    assert excinfo.value.provider == "ollama"
+
+    # With valid key -> OllamaProvider instantiated
+    provider = LLMProviderFactory.create(ModelConfig(provider="ollama", api_key="test-key"))
+    assert isinstance(provider, OllamaProvider)
+    assert provider.model_name == "gemma4:31b"
+    assert provider.chat_url == "https://ollama.com/api/chat"
 
 
 # ============================================================================

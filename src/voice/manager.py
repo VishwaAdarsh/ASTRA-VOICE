@@ -51,6 +51,14 @@ class VoiceManager:
             tts_volume=self.config.tts_volume,
             voice_language=self.config.voice_language,
             api_key=self.config.voice_api_key,
+            tts_api_key=getattr(self.config, "tts_api_key", self.config.voice_api_key),
+            tts_model=getattr(self.config, "tts_model", "eleven_turbo_v2_5"),
+            tts_voice_id=getattr(self.config, "tts_voice_id", "JBFqnCBsd6RMkjVDRZzb"),
+            tts_base_url=getattr(self.config, "tts_base_url", "https://api.elevenlabs.io"),
+            tts_timeout=getattr(self.config, "tts_timeout", 15.0),
+            tts_max_retries=getattr(self.config, "tts_max_retries", 2),
+            tts_stability=getattr(self.config, "tts_stability", 0.5),
+            tts_similarity_boost=getattr(self.config, "tts_similarity_boost", 0.75),
             audio=AudioConfig(
                 sample_rate=getattr(self.config, "voice_sample_rate", 16000),
                 channels=getattr(self.config, "voice_channels", 1),
@@ -81,6 +89,15 @@ class VoiceManager:
             self.voice_config.tts_provider,
             rate=self.voice_config.tts_rate,
             volume=self.voice_config.tts_volume,
+            api_key=self.voice_config.tts_api_key,
+            model=self.voice_config.tts_model,
+            voice_id=self.voice_config.tts_voice_id,
+            base_url=self.voice_config.tts_base_url,
+            timeout=self.voice_config.tts_timeout,
+            max_retries=self.voice_config.tts_max_retries,
+            stability=self.voice_config.tts_stability,
+            similarity_boost=self.voice_config.tts_similarity_boost,
+            health_manager=self.health_manager,
         )
 
         # Initialize Voice Session state machine

@@ -636,9 +636,11 @@ def create_app(
             "autoSpeak": True,
             "theme": "dark",
             "llm_provider": cfg.llm_provider,
-            "llm_model": cfg.llm_model,
+            "llm_model": cfg.llm_active_model,
             "stt_provider": cfg.stt_provider,
             "tts_provider": cfg.tts_provider,
+            "tts_model": getattr(cfg, "tts_model", "eleven_turbo_v2_5"),
+            "tts_voice_id": getattr(cfg, "tts_voice_id", "JBFqnCBsd6RMkjVDRZzb"),
             "permissions_mode": cfg.permissions_mode,
             "version": "1.0.0",
         }

@@ -69,7 +69,7 @@ class Pyttsx3TTSProvider(TextToSpeechProvider):
     with a serialized queue to prevent concurrent overlapping utterances.
     """
 
-    def __init__(self, rate: int = 175, volume: float = 1.0):
+    def __init__(self, rate: int = 175, volume: float = 1.0, **kwargs):
         self.rate = rate
         self.volume = volume
         self._is_speaking_flag = False
@@ -263,7 +263,7 @@ class Pyttsx3TTSProvider(TextToSpeechProvider):
 class MockTTSProvider(TextToSpeechProvider):
     """Mock TTS Provider for deterministic unit testing and non-audio environments."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.spoken_history: list[str] = []
         self._speaking = False
         self._is_interrupted = False
@@ -309,10 +309,19 @@ class TTSProviderFactory:
         normalized = provider_name.strip().lower()
         if normalized in ("pyttsx3", "sapi5", "default"):
             return Pyttsx3TTSProvider(**kwargs)
+        elif normalized in ("elevenlabs", "eleven_labs", "cloud"):
+            from src.voice.elevenlabs_provider import ElevenLabsTTSProvider
+            return ElevenLabsTTSProvider(**kwargs)
         elif normalized == "mock":
-            return MockTTSProvider()
+            return MockTTSProvider(**kwargs)
         else:
             raise VoiceConfigurationError(
                 f"Unknown or unsupported TTS provider '{provider_name}'. "
-                "Supported providers are: 'pyttsx3', 'mock'."
+                "Supported providers are: 'elevenlabs', 'pyttsx3', 'mock'."
             )
+
+
+def sanitize_text_for_speech(text: str) -> str:
+    """Sanitize response text for speech synthesis and secret protection."""
+    from src.voice.elevenlabs_provider import sanitize_text_for_speech as _sanitize
+    return _sanitize(text)
