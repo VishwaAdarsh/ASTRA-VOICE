@@ -57,9 +57,16 @@ class MockLLMProvider(LLMProvider):
 
         # Check if previous steps already completed successfully in prompt context
         if "Execution Steps Taken So Far:" in prompt and "Status: SUCCESS" in prompt and "None (Initial Step)" not in prompt:
+            msg = "Task completed successfully."
+            if "system_information" in prompt:
+                msg = "System: Windows operational."
+            elif "calculator" in prompt:
+                msg = "Done. Calculator opened."
+            elif "notepad" in prompt:
+                msg = "Done. Notepad opened."
             return LLMDecision(
                 decision_type=DecisionType.RESPONSE,
-                message="Done. Calculator opened.",
+                message=msg,
                 usage=usage,
             )
 
@@ -172,6 +179,14 @@ class MockLLMProvider(LLMProvider):
                 tool_name="open_application",
                 arguments={"app_name": "notepad"},
                 reason="User requested opening notepad application.",
+                usage=usage,
+            )
+        elif "system info" in req_text or "system information" in req_text:
+            return LLMDecision(
+                decision_type=DecisionType.TOOL_CALL,
+                tool_name="system_information",
+                arguments={},
+                reason="User requested system information.",
                 usage=usage,
             )
         elif "chrome" in req_text:

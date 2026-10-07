@@ -273,9 +273,20 @@ class ElevenLabsTTSProvider(TextToSpeechProvider):
         max_attempts = max(1, self.max_retries + 1)
         last_exception: Optional[Exception] = None
 
+        if (
+            self._is_interrupted_flag
+            or self._stop_event.is_set()
+            or getattr(self._client, "is_closed", False)
+        ):
+            return b""
+
         while attempts < max_attempts:
-            if self._is_interrupted_flag or self._stop_event.is_set():
-                logger.info("[TTS] Synthesis aborted due to interruption.")
+            if (
+                self._is_interrupted_flag
+                or self._stop_event.is_set()
+                or getattr(self._client, "is_closed", False)
+            ):
+                logger.info("[TTS] Synthesis aborted due to interruption or shutdown.")
                 return b""
 
             attempts += 1
@@ -357,7 +368,14 @@ class ElevenLabsTTSProvider(TextToSpeechProvider):
                 time.sleep(backoff)
             except (ElevenLabsAuthError, ElevenLabsQuotaExceededError, ElevenLabsTTSError):
                 raise
+            except RuntimeError as re_err:
+                if "closed" in str(re_err).lower():
+                    logger.debug("[TTS] HTTP client closed during synthesis.")
+                    return b""
+                raise
             except Exception as e:
+                if self._stop_event.is_set() or getattr(self._client, "is_closed", False):
+                    return b""
                 clean_e = SecretRedactionFilter.redact(str(e))
                 logger.error(f"[TTS] Unexpected synthesis error: {clean_e}")
                 self._update_health(HealthStatus.DEGRADED, f"ElevenLabs error: {clean_e}")
@@ -429,7 +447,7 @@ class ElevenLabsTTSProvider(TextToSpeechProvider):
             with self._lock:
                 self._current_done_event = done_event
 
-            if not sentence or not sentence.strip() or self._is_interrupted_flag:
+            if not sentence or not sentence.strip() or self._is_interrupted_flag or self._stop_event.is_set():
                 if done_event:
                     done_event.set()
                 continue
@@ -442,12 +460,13 @@ class ElevenLabsTTSProvider(TextToSpeechProvider):
                 pcm_data = self.synthesize(sentence)
 
                 # 2. Play audio if not interrupted
-                if pcm_data and not self._is_interrupted_flag:
+                if pcm_data and not self._is_interrupted_flag and not self._stop_event.is_set():
                     self._play_pcm_audio(pcm_data)
 
             except Exception as e:
-                clean_err = SecretRedactionFilter.redact(str(e))
-                logger.error(f"[TTS] Error processing speech chunk: {clean_err}")
+                if not self._stop_event.is_set():
+                    clean_err = SecretRedactionFilter.redact(str(e))
+                    logger.error(f"[TTS] Error processing speech chunk: {clean_err}")
             finally:
                 if self._queue.empty():
                     self._is_speaking_flag = False
@@ -499,12 +518,13 @@ class ElevenLabsTTSProvider(TextToSpeechProvider):
 
     def shutdown(self) -> None:
         """Cleanly shutdown TTS worker thread and release HTTP / audio resources."""
-        self.stop()
+        self._is_interrupted_flag = True
         self._stop_event.set()
+        self.stop()
         self._queue.put(None)
 
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=1.0)
+            self._worker_thread.join(timeout=2.0)
         self._worker_thread = None
 
         if self._owned_client:

@@ -121,7 +121,10 @@ class MicrophoneManager:
     def _audio_callback(self, indata, frames, time_info, status) -> None:
         """Stream callback invoked by sounddevice for each audio block."""
         if status:
-            logger.warning(f"Microphone input stream warning: {status}")
+            now = time.time()
+            if not hasattr(self, "_last_status_log_time") or (now - getattr(self, "_last_status_log_time", 0.0)) > 5.0:
+                self._last_status_log_time = now
+                logger.warning(f"Microphone input stream warning: {status} (throttled)")
 
         if self._is_paused or not self._is_capturing:
             return

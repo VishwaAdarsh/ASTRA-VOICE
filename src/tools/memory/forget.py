@@ -36,7 +36,7 @@ class ForgetMemoryTool(BaseTool):
         "type": "object",
         "properties": {
             "memory_id": {
-                "type": ["string", "integer"],
+                "type": "string",
                 "description": "Unique identifier of the memory item to delete (string 'mem_...' or integer ID)",
             },
             "target": {

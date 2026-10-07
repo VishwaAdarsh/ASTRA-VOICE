@@ -183,6 +183,17 @@ class GeminiProvider(LLMProvider):
                     "parameters",
                     {"type": "object", "properties": {}, "required": []},
                 )
+                # Defensively normalize property types for Google GenAI schema validator
+                if isinstance(parameters, dict):
+                    import copy
+                    parameters = copy.deepcopy(parameters)
+                    props = parameters.get("properties", {})
+                    if isinstance(props, dict):
+                        for p_name, p_def in props.items():
+                            if isinstance(p_def, dict):
+                                p_type = p_def.get("type")
+                                if isinstance(p_type, list):
+                                    p_def["type"] = "string" if "string" in p_type else (str(p_type[0]) if p_type else "string")
 
                 func_decl = types.FunctionDeclaration(
                     name=name,
@@ -279,11 +290,22 @@ class GeminiProvider(LLMProvider):
                 arguments = dict(fc.args or {})
                 logger.info(f"[LLM] Gemini selected tool: '{tool_name}' with args: {arguments}")
 
+                # Safely extract text parts without triggering non-text parts warning
+                text_parts = []
+                for candidate in getattr(response, "candidates", []) or []:
+                    content = getattr(candidate, "content", None)
+                    if content and hasattr(content, "parts"):
+                        for part in (content.parts or []):
+                            part_text = getattr(part, "text", None)
+                            if part_text:
+                                text_parts.append(part_text)
+                raw_resp = " ".join(text_parts).strip() or f"tool_call:{tool_name}"
+
                 return LLMDecision(
                     decision_type=DecisionType.TOOL_CALL,
                     tool_name=tool_name,
                     arguments=arguments,
-                    raw_response=str(response.text or ""),
+                    raw_response=raw_resp,
                     usage=usage,
                 )
 

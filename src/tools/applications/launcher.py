@@ -3,6 +3,7 @@ Open Application Tool.
 Launches allowlisted desktop applications on Windows.
 """
 
+import os
 import subprocess
 import time
 from typing import Any
@@ -67,7 +68,14 @@ class OpenApplicationTool(BaseTool):
 
         try:
             # Use subprocess.Popen with safe argument list, no shell=True
-            subprocess.Popen([executable], creationflags=subprocess.DETACHED_PROCESS if hasattr(subprocess, "DETACHED_PROCESS") else 0)
+            try:
+                subprocess.Popen([executable], creationflags=subprocess.DETACHED_PROCESS if hasattr(subprocess, "DETACHED_PROCESS") else 0)
+            except (FileNotFoundError, OSError):
+                # Fallback on Windows: os.startfile via Shell execution
+                if hasattr(os, "startfile"):
+                    os.startfile(executable)
+                else:
+                    raise
             formatted_name = app_name.capitalize()
             logger.info(f"Successfully launched application '{executable}' ({app_name})")
 

@@ -149,7 +149,13 @@ def main():
     time.sleep(0.4)  # Allow uvicorn socket binding
 
     # Register OS signal handlers for graceful shutdown
+    _shutting_down = False
+
     def _sig_handler(sig, frame):
+        nonlocal _shutting_down
+        if _shutting_down:
+            return
+        _shutting_down = True
         print("\n[ASTRA] Shutdown signal received. Stopping server and engines...")
         try:
             if hasattr(server, "app") and hasattr(server.app, "state"):
@@ -157,8 +163,14 @@ def main():
         except Exception:
             pass
         server.should_exit = True
-        voice_mgr.shutdown()
-        lifecycle.shutdown(agent)
+        try:
+            voice_mgr.shutdown()
+        except Exception:
+            pass
+        try:
+            lifecycle.shutdown(agent)
+        except Exception:
+            pass
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _sig_handler)
@@ -172,9 +184,17 @@ def main():
         except KeyboardInterrupt:
             _sig_handler(None, None)
         finally:
-            server.should_exit = True
-            voice_mgr.shutdown()
-            lifecycle.shutdown(agent)
+            if not _shutting_down:
+                _shutting_down = True
+                server.should_exit = True
+                try:
+                    voice_mgr.shutdown()
+                except Exception:
+                    pass
+                try:
+                    lifecycle.shutdown(agent)
+                except Exception:
+                    pass
 
 
     elif args.cli:
