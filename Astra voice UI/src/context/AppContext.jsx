@@ -119,11 +119,33 @@ export const AppProvider = ({ children }) => {
     const unbindBrainStarted = astraApi.on('BRAIN_STARTED', (data) => {
       setAssistantState('thinking');
       setCommandStatus('PROCESSING');
-      if (data.input) setInterimTranscript(`Processing: "${data.input}"`);
+      if (data.input) {
+        setInterimTranscript(`Processing: "${data.input}"`);
+        if (data.source === 'voice') {
+          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setMessages((prev) => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.sender === 'user' && lastMsg.text === data.input) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                id: 'msg-' + Date.now(),
+                sender: 'user',
+                text: data.input,
+                timestamp: timeStr,
+              },
+            ];
+          });
+        }
+      }
     });
 
     const unbindBrainCompleted = astraApi.on('BRAIN_COMPLETED', (data) => {
-      setAssistantState('idle');
+      if (data.source !== 'voice') {
+        setAssistantState('idle');
+      }
       setCommandStatus('COMPLETED');
       setInterimTranscript('');
       if (data.response) {
@@ -141,7 +163,14 @@ export const AppProvider = ({ children }) => {
     });
 
     const unbindVoiceState = astraApi.on('VOICE_STATE_CHANGED', (data) => {
-      if (data.state) setAssistantState(data.state);
+      if (data.state) {
+        setAssistantState(data.state);
+        if (data.state === 'interrupted') {
+          setCommandStatus('INTERRUPTED');
+        } else if (data.state === 'idle') {
+          setCommandStatus((prev) => (prev === 'INTERRUPTED' || prev === 'PROCESSING' || prev === 'SUBMITTING' ? 'IDLE' : prev));
+        }
+      }
     });
 
     const unbindHealth = astraApi.on('HEALTH_CHANGED', (data) => {

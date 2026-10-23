@@ -33,7 +33,9 @@ class RuleBasedIntentRecognizer(IntentRecognizer):
         # Known apps for disambiguation
         self.app_keywords = {
             "calculator", "calc", "notepad", "chrome", "google chrome",
-            "vscode", "code", "explorer", "paint", "cmd"
+            "browser", "edge", "microsoft edge", "vscode", "code",
+            "visual studio code", "explorer", "file explorer", "paint",
+            "mspaint", "settings", "windows settings", "cmd", "terminal"
         }
 
     def recognize(self, command: Command) -> Intent:

@@ -183,6 +183,11 @@ class BargeInCoordinator:
 
         try:
             while self.session.tts.is_speaking():
+                if getattr(self.session, "_cancel_requested", None) and self.session._cancel_requested.is_set():
+                    logger.info("[BARGE-IN] TTS playback cancelled by user request.")
+                    self.session.tts.stop()
+                    break
+
                 if (time.time() - start_time) > timeout:
                     logger.warning("[BARGE-IN] Monitoring timed out while waiting for TTS completion.")
                     break

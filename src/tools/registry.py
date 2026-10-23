@@ -32,6 +32,8 @@ DEFAULT_TOOL_METADATA: dict[str, dict[str, Any]] = {
     "resource_information": {"category": CapabilityCategory.SYSTEM, "risk": RiskLevel.RISK_1, "platforms": ["windows"], "read_only": True},
     "screenshot": {"category": CapabilityCategory.SYSTEM, "risk": RiskLevel.RISK_1, "platforms": ["windows"], "read_only": True},
     "volume_control": {"category": CapabilityCategory.SYSTEM, "risk": RiskLevel.RISK_2, "platforms": ["windows"], "reversible": True},
+    "read_clipboard": {"category": CapabilityCategory.SYSTEM, "risk": RiskLevel.RISK_1, "platforms": ["windows", "linux", "darwin"], "read_only": True},
+    "write_clipboard": {"category": CapabilityCategory.SYSTEM, "risk": RiskLevel.RISK_2, "platforms": ["windows", "linux", "darwin"], "reversible": True},
     "open_folder": {"category": CapabilityCategory.FILESYSTEM, "risk": RiskLevel.RISK_2, "platforms": ["windows"], "reversible": True},
     "search_files": {"category": CapabilityCategory.FILESYSTEM, "risk": RiskLevel.RISK_1, "platforms": ["windows", "linux", "darwin"], "read_only": True},
     "file_metadata": {"category": CapabilityCategory.FILESYSTEM, "risk": RiskLevel.RISK_1, "platforms": ["windows", "linux", "darwin"], "read_only": True},

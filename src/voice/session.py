@@ -4,6 +4,7 @@ Governs state transitions, continuous audio capture, speech segmentation (VAD),
 STT transcription, core agent cognitive processing, latency telemetry, and TTS output.
 """
 
+import threading
 import time
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
@@ -63,6 +64,7 @@ class VoiceSession:
         # Initialize barge-in interruption coordinator (Phase V2-06)
         self.barge_in = BargeInCoordinator(self, config=self.config)
 
+        self._cancel_requested = threading.Event()
         self.last_metrics: VoiceMetrics | None = None
 
     def _set_state(self, new_state: VoiceState, details: dict | None = None) -> None:
@@ -88,10 +90,25 @@ class VoiceSession:
         if self.event_bus:
             try:
                 from src.core.events.models import ASTRAEvent, AstraEventType
-                bus_name = f"VOICE_{new_state.name if hasattr(new_state, 'name') else str(new_state).upper()}_STARTED"
-                bus_type = getattr(AstraEventType, bus_name, None)
+                state_event_map = {
+                    VoiceState.IDLE: AstraEventType.VOICE_SESSION_ENDED,
+                    VoiceState.SLEEPING: AstraEventType.VOICE_SESSION_ENDED,
+                    VoiceState.WAKE_WORD_LISTENING: AstraEventType.VOICE_SESSION_STARTED,
+                    VoiceState.WAKE_DETECTED: AstraEventType.WAKE_WORD_DETECTED,
+                    VoiceState.LISTENING: AstraEventType.VOICE_LISTENING_STARTED,
+                    VoiceState.SPEECH_DETECTED: AstraEventType.VOICE_SPEECH_DETECTED,
+                    VoiceState.CAPTURING: AstraEventType.VOICE_CAPTURING_STARTED,
+                    VoiceState.PROCESSING: AstraEventType.VOICE_TRANSCRIBING,
+                    VoiceState.SPEAKING: AstraEventType.VOICE_SPEAKING_STARTED,
+                    VoiceState.BARGE_IN_DETECTED: AstraEventType.BARGE_IN_DETECTED,
+                    VoiceState.INTERRUPTING: AstraEventType.VOICE_INTERRUPTED,
+                    VoiceState.INTERRUPTED: AstraEventType.VOICE_INTERRUPTED,
+                    VoiceState.ERROR: AstraEventType.VOICE_ERROR,
+                }
+                bus_type = state_event_map.get(new_state)
                 if not bus_type:
-                    bus_type = getattr(AstraEventType, f"VOICE_{new_state.name if hasattr(new_state, 'name') else str(new_state).upper()}", AstraEventType.VOICE_SESSION_STARTED)
+                    bus_name = f"VOICE_{new_state.name if hasattr(new_state, 'name') else str(new_state).upper()}_STARTED"
+                    bus_type = getattr(AstraEventType, bus_name, AstraEventType.VOICE_SESSION_STARTED)
                 self.event_bus.publish(
                     ASTRAEvent(
                         event_type=bus_type,
@@ -146,6 +163,7 @@ class VoiceSession:
         Execute a voice turn interaction:
         Continuous Capture / VAD -> Speech Segmentation -> STT -> Agent -> TTS with latency telemetry.
         """
+        self._cancel_requested.clear()
         metrics = VoiceMetrics()
         metrics.capture_start_ts = time.time()
         self.last_metrics = metrics
@@ -215,7 +233,8 @@ class VoiceSession:
 
             # 4. Route to ASTRA Core Agent Execution
             metrics.agent_start_ts = time.time()
-            response_text, tool_result = self.agent.process_command(transcript)
+            voice_req_id = f"voice-{int(time.time() * 1000)}"
+            response_text, tool_result = self.agent.process_command(transcript, request_id=voice_req_id)
             metrics.agent_end_ts = time.time()
             self.emit_event(VoiceEvent.PROCESSING_COMPLETED, {"response": response_text})
 
@@ -334,6 +353,10 @@ class VoiceSession:
         speech_detected = False
 
         while True:
+            if self._cancel_requested.is_set():
+                logger.info("Speech capture cancelled by user request.")
+                return None
+
             # Check timeout if speech hasn't started yet
             if not speech_detected and (time.time() - t_listen_start) > timeout:
                 logger.info(f"Listening timed out after {timeout:.1f}s without speech.")
@@ -359,9 +382,10 @@ class VoiceSession:
                 return segment
 
     def stop_speaking(self) -> None:
-        """Interrupt and stop speech playback immediately."""
+        """Interrupt and stop speech playback or active listening immediately."""
+        self._cancel_requested.set()
         self.tts.stop()
         if self.state in (VoiceState.SPEAKING, VoiceState.BARGE_IN_DETECTED, VoiceState.INTERRUPTING):
             self._set_state(VoiceState.INTERRUPTED)
             self.emit_event(VoiceEvent.VOICE_INTERRUPTED)
-            self._set_state(VoiceState.IDLE)
+        self._set_state(VoiceState.IDLE)

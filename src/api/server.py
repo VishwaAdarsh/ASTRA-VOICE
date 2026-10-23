@@ -6,6 +6,7 @@ idempotency protection, localhost CORS restrictions, and normalized error respon
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import json
 import os
@@ -278,7 +279,15 @@ def create_app(
     event_bus: Optional[EventBus] = None,
 ) -> FastAPI:
     """Factory creating FastAPI application bound to AstraAgent, VoiceManager, and dynamic runtime info."""
-    app = FastAPI(title="ASTRA Engine API", version="1.0.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        loop = asyncio.get_running_loop()
+        if hasattr(app.state, "ui_adapter") and app.state.ui_adapter:
+            app.state.ui_adapter.set_loop(loop)
+        yield
+
+    app = FastAPI(title="ASTRA Engine API", version="1.0.0", lifespan=lifespan)
 
     # Localhost Security: Restrict CORS to local WebEngine and development origins
     allowed_origins = [
@@ -365,6 +374,9 @@ def create_app(
     # -------------------------------
     @app.websocket("/api/v1/ws")
     async def websocket_endpoint(websocket: WebSocket):
+        loop = asyncio.get_running_loop()
+        if hasattr(app.state, "ui_adapter") and app.state.ui_adapter:
+            app.state.ui_adapter.set_loop(loop)
         await ws_manager.connect(websocket)
         try:
             # Send initial state snapshot on connection

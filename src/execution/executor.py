@@ -48,8 +48,10 @@ class ToolExecutor:
         confirmation_handler: ConfirmationHandler | None = None,
         resolver: CapabilityResolver | None = None,
         event_bus: Optional[Any] = None,
+        config: Optional[Any] = None,
     ):
         self.registry = registry
+        self.config = config
         self.permission_manager = permission_manager or PermissionManager()
         self.verifier = verifier or ToolVerifier()
         self.confirmation_handler = confirmation_handler or ConsoleConfirmationHandler()

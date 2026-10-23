@@ -60,10 +60,12 @@ from src.tools.memory import (
     RetrieveMemoryTool,
 )
 from src.tools.system import (
+    ReadClipboardTool,
     ResourceInformationTool,
     ScreenshotTool,
     SystemInformationTool,
     VolumeControlTool,
+    WriteClipboardTool,
 )
 from src.tools.vision import (
     AnalyzeActiveWindowTool,
@@ -179,6 +181,8 @@ class AstraAgent:
         self.registry.register(ResourceInformationTool())
         self.registry.register(ScreenshotTool(config=self.config))
         self.registry.register(VolumeControlTool())
+        self.registry.register(ReadClipboardTool(config=self.config))
+        self.registry.register(WriteClipboardTool(config=self.config))
 
         # Phase 6 Web Intelligence
         self.registry.register(SearchWebTool(config=self.config))

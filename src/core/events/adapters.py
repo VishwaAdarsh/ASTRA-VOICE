@@ -79,6 +79,10 @@ class UIEventAdapter:
         self._registered = False
         self.register()
 
+    def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Bind or update the active running asyncio event loop."""
+        self.loop = loop
+
     def register(self) -> None:
         """Subscribe to the Event Bus for all UI-relevant events."""
         if not self._registered:
@@ -113,7 +117,71 @@ class UIEventAdapter:
             **event.payload,
         }
 
+        # 1. Broadcast the primary typed envelope
         self._broadcast_to_ui(event_type_str, ui_payload, event.request_id)
+
+        # 2. Bridge Voice state machine transitions to standard VOICE_STATE_CHANGED for UI
+        voice_state_map = {
+            AstraEventType.VOICE_LISTENING_STARTED.value: "listening",
+            AstraEventType.VOICE_SPEECH_DETECTED.value: "listening",
+            AstraEventType.VOICE_CAPTURING_STARTED.value: "listening",
+            AstraEventType.VOICE_TRANSCRIBING.value: "thinking",
+            AstraEventType.VOICE_SPEAKING_STARTED.value: "speaking",
+            AstraEventType.VOICE_INTERRUPTED.value: "interrupted",
+            AstraEventType.BARGE_IN_DETECTED.value: "interrupted",
+            AstraEventType.VOICE_SPEAKING_STOPPED.value: "idle",
+            AstraEventType.VOICE_SESSION_ENDED.value: "idle",
+            AstraEventType.VOICE_ERROR.value: "error",
+        }
+        if event_type_str in voice_state_map:
+            st = voice_state_map[event_type_str]
+            self._broadcast_to_ui(
+                "VOICE_STATE_CHANGED",
+                {
+                    "type": "VOICE_STATE_CHANGED",
+                    "state": st,
+                    "source": event.source,
+                    **(event.payload or {}),
+                },
+                event.request_id,
+            )
+
+        # 3. Bridge Agent lifecycle events to standard BRAIN_STARTED and BRAIN_COMPLETED for voice turns
+        is_voice_turn = event.source == "voice" or (
+            event.request_id and str(event.request_id).startswith("voice-")
+        )
+        if is_voice_turn:
+            if event_type_str == AstraEventType.AGENT_STARTED.value:
+                self._broadcast_to_ui(
+                    "BRAIN_STARTED",
+                    {
+                        "type": "BRAIN_STARTED",
+                        "input": event.payload.get("input", ""),
+                        "source": "voice",
+                        **(event.payload or {}),
+                    },
+                    event.request_id,
+                )
+                self._broadcast_to_ui(
+                    "VOICE_STATE_CHANGED",
+                    {
+                        "type": "VOICE_STATE_CHANGED",
+                        "state": "thinking",
+                        "source": "voice",
+                    },
+                    event.request_id,
+                )
+            elif event_type_str == AstraEventType.AGENT_COMPLETED.value:
+                self._broadcast_to_ui(
+                    "BRAIN_COMPLETED",
+                    {
+                        "type": "BRAIN_COMPLETED",
+                        "response": event.payload.get("response", ""),
+                        "source": "voice",
+                        **(event.payload or {}),
+                    },
+                    event.request_id,
+                )
 
     def _broadcast_to_ui(
         self,

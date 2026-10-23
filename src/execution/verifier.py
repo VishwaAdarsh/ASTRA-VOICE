@@ -67,6 +67,11 @@ class ToolVerifier:
                 return False, f"Invalid website target '{target}'."
             return True, None
 
+        elif tool_name == "write_clipboard":
+            if "text" not in parameters or not isinstance(parameters.get("text"), str):
+                return False, "Missing or invalid 'text' parameter for write_clipboard."
+            return True, None
+
         return True, None
 
     def verify_post_execution(
