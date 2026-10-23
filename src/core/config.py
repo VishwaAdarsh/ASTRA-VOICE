@@ -187,6 +187,19 @@ class Config:
         # Thinking control: "false" (default, no reasoning trace), "true", "low"/"medium"/"high", or "" for model default
         self.ollama_think = os.getenv("OLLAMA_THINK", "false").strip().lower() or None
 
+        # OpenRouter LLM Provider (Free Models Only by default: https://openrouter.ai/api/v1)
+        # SECURITY: the key is environment-only; never hard-code, log, or expose it to the frontend.
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        self.openrouter_base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip().rstrip("/")
+        self.openrouter_chat_endpoint = os.getenv("OPENROUTER_CHAT_ENDPOINT", "/chat/completions").strip()
+        self.openrouter_model = os.getenv("OPENROUTER_MODEL", "openrouter/free").strip() or "openrouter/free"
+        self.openrouter_timeout = float(os.getenv("OPENROUTER_TIMEOUT", "45"))
+        self.openrouter_max_retries = int(os.getenv("OPENROUTER_MAX_RETRIES", "2"))
+        self.openrouter_site_url = os.getenv("OPENROUTER_SITE_URL", "").strip()
+        self.openrouter_app_name = os.getenv("OPENROUTER_APP_NAME", "ASTRA").strip()
+        self.openrouter_allow_paid_models = os.getenv("OPENROUTER_ALLOW_PAID_MODELS", "false").lower() in ("true", "1", "yes")
+        self.llm_fallback_provider = os.getenv("LLM_FALLBACK_PROVIDER", "").strip().lower()
+
 
 
         # Filesystem Controls (Phase 5)
@@ -255,6 +268,8 @@ class Config:
         """Model name actually used by the configured LLM provider (safe to expose)."""
         if self.llm_provider == "ollama":
             return self.ollama_model
+        if self.llm_provider == "openrouter":
+            return self.openrouter_model
         return self.llm_model
 
     def is_app_allowed(self, app_name: str) -> bool:

@@ -197,10 +197,13 @@ def test_spoken_command_bridges_brain_started_completed(mock_event_bus):
                 payload={"input": "open notepad"},
             )
         )
-        loop.run_until_complete(asyncio.sleep(0.01))
+        for _ in range(25):
+            calls = [c.args for c in ws_mock.broadcast.call_args_list]
+            brain_started = [arg for arg in calls if arg[0] == "BRAIN_STARTED"]
+            if brain_started:
+                break
+            loop.run_until_complete(asyncio.sleep(0.02))
 
-        calls = [c.args for c in ws_mock.broadcast.call_args_list]
-        brain_started = [arg for arg in calls if arg[0] == "BRAIN_STARTED"]
         assert len(brain_started) == 1
         assert brain_started[0][1]["input"] == "open notepad"
         assert brain_started[0][1]["source"] == "voice"
@@ -214,10 +217,13 @@ def test_spoken_command_bridges_brain_started_completed(mock_event_bus):
                 payload={"response": "Notepad opened successfully.", "status": "SUCCESS"},
             )
         )
-        loop.run_until_complete(asyncio.sleep(0.01))
+        for _ in range(25):
+            calls = [c.args for c in ws_mock.broadcast.call_args_list]
+            brain_completed = [arg for arg in calls if arg[0] == "BRAIN_COMPLETED"]
+            if brain_completed:
+                break
+            loop.run_until_complete(asyncio.sleep(0.02))
 
-        calls = [c.args for c in ws_mock.broadcast.call_args_list]
-        brain_completed = [arg for arg in calls if arg[0] == "BRAIN_COMPLETED"]
         assert len(brain_completed) == 1
         assert brain_completed[0][1]["response"] == "Notepad opened successfully."
         assert brain_completed[0][1]["source"] == "voice"

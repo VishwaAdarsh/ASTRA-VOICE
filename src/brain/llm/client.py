@@ -51,12 +51,23 @@ class LLMClient:
         config: ModelConfig,
         provider: LLMProvider | None = None,
         health_manager: HealthManager | None = None,
+        fallback_provider: LLMProvider | None = None,
     ):
         self.config = config
         self.provider = provider or LLMProviderFactory.create(self.config)
         self.health_manager = health_manager
+        self.fallback_provider = fallback_provider
         self.provider_state: ProviderHealthState = ProviderHealthState.UNKNOWN
         self.last_error_type: LLMErrorType | None = None
+
+        # Instantiate configured fallback provider if specified and not provided
+        if not self.fallback_provider and getattr(self.config, "fallback_provider", ""):
+            try:
+                fb_name = getattr(self.config, "fallback_provider").strip().lower()
+                fb_config = ModelConfig(provider=fb_name)
+                self.fallback_provider = LLMProviderFactory.create(fb_config)
+            except Exception as e:
+                logger.warning(f"Could not instantiate configured LLM fallback provider '{self.config.fallback_provider}': {e}")
 
     # ------------------------------------------------------------------
     # Provider identity / status (safe, credential-free)
@@ -70,7 +81,12 @@ class LLMClient:
         return str(getattr(self.provider, "model_name", None) or self.config.model_name or "")
 
     def _provider_label(self) -> str:
-        return {"ollama": "Ollama", "gemini": "Gemini", "mock": "Mock"}.get(self.provider_name, self.provider_name.title())
+        return {
+            "ollama": "Ollama",
+            "gemini": "Gemini",
+            "mock": "Mock",
+            "openrouter": "OpenRouter",
+        }.get(self.provider_name, self.provider_name.title())
 
     def _record_state(self, state: ProviderHealthState, health: HealthStatus, detail: str = "") -> None:
         self.provider_state = state
@@ -165,6 +181,17 @@ class LLMClient:
                     logger.error(
                         f"LLM non-retryable error ({err_type.value}): {err_msg}. Aborting retries immediately."
                     )
+                    if self.fallback_provider:
+                        logger.warning(
+                            f"Failing over from primary provider '{self.provider_name}' to fallback '{getattr(self.fallback_provider.config, 'provider', 'fallback')}'."
+                        )
+                        try:
+                            fb_decision = self.fallback_provider.generate_structured(prompt, system_prompt, tool_schemas)
+                            fb_decision.reason = f"Failover from {self.provider_name}: {err_msg}"
+                            return fb_decision
+                        except Exception as fb_err:
+                            logger.error(f"Fallback provider also failed: {fb_err}")
+
                     return LLMDecision(
                         decision_type=DecisionType.ERROR,
                         error_type=err_type,
@@ -197,6 +224,17 @@ class LLMClient:
                     logger.error(
                         f"LLM max retry limit reached ({max_attempts}). Last error ({err_type.value}): {err_msg}"
                     )
+                    if self.fallback_provider:
+                        logger.warning(
+                            f"Failing over from primary provider '{self.provider_name}' to fallback '{getattr(self.fallback_provider.config, 'provider', 'fallback')}' after retry exhaustion."
+                        )
+                        try:
+                            fb_decision = self.fallback_provider.generate_structured(prompt, system_prompt, tool_schemas)
+                            fb_decision.reason = f"Failover from {self.provider_name}: {err_msg}"
+                            return fb_decision
+                        except Exception as fb_err:
+                            logger.error(f"Fallback provider also failed: {fb_err}")
+
                     return LLMDecision(
                         decision_type=DecisionType.ERROR,
                         error_type=err_type,
@@ -237,5 +275,10 @@ class LLMClient:
     def shutdown(self) -> None:
         """Shut down underlying provider resources."""
         self.provider.shutdown()
+        if self.fallback_provider:
+            try:
+                self.fallback_provider.shutdown()
+            except Exception as e:
+                logger.debug(f"Fallback provider shutdown notice: {e}")
 
 

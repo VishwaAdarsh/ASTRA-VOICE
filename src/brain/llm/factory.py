@@ -10,6 +10,7 @@ from src.brain.llm.gemini_provider import GeminiProvider
 from src.brain.llm.mock_provider import MockLLMProvider
 from src.brain.llm.models import LLMDecision, ModelConfig
 from src.brain.llm.ollama_provider import OllamaProvider
+from src.brain.llm.openrouter_provider import OpenRouterProvider
 from src.brain.llm.provider import LLMProvider
 from src.core.logger import get_logger
 
@@ -52,6 +53,7 @@ class LLMProviderFactory:
         "google_gemini": GeminiProvider,
         "google-gemini": GeminiProvider,
         "ollama": OllamaProvider,
+        "openrouter": OpenRouterProvider,
     }
 
     _deferred_providers: set[str] = {
@@ -89,6 +91,10 @@ class LLMProviderFactory:
         if provider_name == "ollama":
             return OllamaProvider(config=config)
 
+        # Real OpenRouter Provider Resolution (raises LLMConfigError on invalid config; never falls back)
+        if provider_name == "openrouter":
+            return OpenRouterProvider(config=config)
+
         # Explicit check for deferred providers (Phase V2-20)
         if provider_name in cls._deferred_providers:
             raise NotImplementedError(
@@ -102,6 +108,6 @@ class LLMProviderFactory:
         # Explicit Error: No silent fallback permitted
         raise LLMConfigError(
             f"Unsupported or unregistered LLM Provider '{config.provider}'. "
-            "No silent fallback permitted. Available providers: 'gemini', 'ollama', 'mock', 'disabled'.",
+            "No silent fallback permitted. Available providers: 'gemini', 'ollama', 'openrouter', 'mock', 'disabled'.",
             provider=config.provider,
         )

@@ -530,6 +530,10 @@ class AstraAgent:
                     logger.info(
                         f"LLM returned fallback/error decision (type={decision.decision_type}). Invoking fallback engine."
                     )
+                    if last_tool_result is not None:
+                        logger.warning("Tool action was already executed prior to LLM failure; returning executed result.")
+                        resp = last_tool_result.message or "Action completed."
+                        return resp, last_tool_result
                     return self._fallback_execution(command, error_decision=decision, request_id=req_id)
 
             # Reached max iterations limit
@@ -553,6 +557,9 @@ class AstraAgent:
 
         except Exception as e:
             logger.error(f"Error during agent orchestration: {e}. Switching to fallback engine.", exc_info=True)
+            if last_tool_result is not None:
+                resp = last_tool_result.message or "Action completed."
+                return resp, last_tool_result
             return self._fallback_execution(command, request_id=req_id)
 
     def _fallback_execution(

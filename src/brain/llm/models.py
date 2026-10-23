@@ -38,11 +38,16 @@ class ModelConfig:
     max_backoff: float = 30.0
     backoff_factor: float = 2.0
     api_key: str = field(default="", repr=False)  # never include secrets in repr/logs
-    # Generic HTTP provider endpoint settings (used by HTTP-based providers such as Ollama)
+    # Generic HTTP provider endpoint settings (used by HTTP-based providers such as Ollama and OpenRouter)
     base_url: str = ""
     chat_endpoint: str = ""
     # Provider "thinking" control: None = provider/model default, "false"/"true"/"low"/"medium"/"high"
     think: str | None = None
+    # OpenRouter specific headers / safety options
+    site_url: str = ""
+    app_name: str = "ASTRA"
+    allow_paid_models: bool = False
+    fallback_provider: str = ""
 
     def __post_init__(self):
         if not self.model_name and self.model:
@@ -62,6 +67,7 @@ class ModelConfig:
             provider=provider,
             temperature=getattr(config, "llm_temperature", 0.2),
             max_output_tokens=getattr(config, "llm_max_output_tokens", 512),
+            fallback_provider=getattr(config, "llm_fallback_provider", ""),
         )
         if provider == "ollama":
             return cls(
@@ -74,6 +80,19 @@ class ModelConfig:
                 base_url=getattr(config, "ollama_base_url", "https://ollama.com"),
                 chat_endpoint=getattr(config, "ollama_chat_endpoint", "/api/chat"),
                 think=getattr(config, "ollama_think", None),
+            )
+        if provider == "openrouter":
+            return cls(
+                **base,
+                model=getattr(config, "openrouter_model", "openrouter/free"),
+                timeout=getattr(config, "openrouter_timeout", 45.0),
+                retry_count=max(0, int(getattr(config, "openrouter_max_retries", 2))) + 1,
+                api_key=getattr(config, "openrouter_api_key", ""),
+                base_url=getattr(config, "openrouter_base_url", "https://openrouter.ai/api/v1"),
+                chat_endpoint=getattr(config, "openrouter_chat_endpoint", "/chat/completions"),
+                site_url=getattr(config, "openrouter_site_url", ""),
+                app_name=getattr(config, "openrouter_app_name", "ASTRA"),
+                allow_paid_models=getattr(config, "openrouter_allow_paid_models", False),
             )
         return cls(
             **base,
